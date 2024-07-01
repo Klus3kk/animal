@@ -21,9 +21,7 @@ func main() {
 			fmt.Println("Exiting...")
 			return
 		default:
-			// Example usage of token type and constants from animal.go
-			token := Token{Type: TT_INT, Value: input}
-			fmt.Println("Token:", token)
+			fmt.Println("Text: ", input)
 		}
 	}
 }

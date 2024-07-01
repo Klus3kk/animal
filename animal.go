@@ -1,9 +1,27 @@
-// animal.go
 package main
 
 import (
 	"fmt"
+	"strconv"
+	"strings"
 )
+
+// CONSTANTS //
+
+const DIGITS string = "0123456789"
+
+// ERRORS //
+
+type Error struct {
+	Error_Name string
+	Details    string
+}
+
+func (e Error) as_string() string {
+	return fmt.Sprintf("(%s): (%s)", e.Error_Name, e.Details)
+}
+
+// TOKENS //
 
 // TokenType defines the type of token
 type TokenType string
@@ -20,6 +38,7 @@ const (
 	TT_EOF    TokenType = "EOF" // End of file
 )
 
+// Class Token
 // Token represents a token with its type and value
 type Token struct {
 	Type  TokenType
@@ -32,4 +51,84 @@ func (t Token) String() string {
 		return fmt.Sprintf("(%s): [%s]", t.Type, t.Value)
 	}
 	return fmt.Sprintf("(%s)", t.Type)
+}
+
+// LEXER //
+
+type Lexer struct {
+	Text        string
+	Pos         int
+	CurrentChar byte
+}
+
+func (l *Lexer) advance() {
+	l.Pos++
+	if l.Pos < len(l.Text) {
+		l.CurrentChar = l.Text[l.Pos]
+	} else {
+		l.CurrentChar = 0 // None
+	}
+}
+
+func (l *Lexer) make_tokens([]Token, error) {
+	tokens := []Token{}
+	var err error
+
+	for l.CurrentChar != 0 {
+		if l.CurrentChar == '\t' {
+			l.advance()
+		} else if strings.IndexByte(DIGITS, l.CurrentChar) != -1 {
+			tokens = append(tokens, l.make_number())
+		} else if l.CurrentChar == '+' {
+			tokens = append(tokens, Token{Type: TT_PLUS, Value: string(l.CurrentChar)})
+			l.advance()
+		} else if l.CurrentChar == '-' {
+			tokens = append(tokens, Token{Type: TT_MINUS, Value: string(l.CurrentChar)})
+			l.advance()
+		} else if l.CurrentChar == '*' {
+			tokens = append(tokens, Token{Type: TT_MUL, Value: string(l.CurrentChar)})
+			l.advance()
+		} else if l.CurrentChar == '/' {
+			tokens = append(tokens, Token{Type: TT_DIV, Value: string(l.CurrentChar)})
+			l.advance()
+		} else if l.CurrentChar == '(' {
+			tokens = append(tokens, Token{Type: TT_LPAREN, Value: string(l.CurrentChar)})
+			l.advance()
+		} else if l.CurrentChar == ')' {
+			tokens = append(tokens, Token{Type: TT_RPAREN, Value: string(l.CurrentChar)})
+			l.advance()
+		} else {
+			char := string(l.CurrentChar)
+			l.advance()
+			err = fmt.Errorf("Unexpected Character: '%s'", char)
+			break
+		}
+	}
+	return tokens, err
+}
+
+func (l *Lexer) make_number() Token {
+	numStr := ""
+	dotCount := 0
+
+	for l.CurrentChar != 0 && strings.ContainsAny(string(l.CurrentChar), DIGITS+".") {
+		if l.CurrentChar == '.' {
+			if dotCount == 1 {
+				break
+			}
+			dotCount++
+			numStr += "."
+		} else {
+			numStr += string(l.CurrentChar)
+		}
+		l.advance()
+	}
+
+	if dotCount == 0 {
+		intValue, _ := strconv.Atoi(numStr) // Convert numStr to int
+		return Token{Type: TT_INT, Value: strconv.Itoa(intValue)}
+	} else {
+		floatValue, _ := strconv.ParseFloat(numStr, 64) // Convert numStr to float64
+		return Token{Type: TT_FLOAT, Value: strconv.FormatFloat(floatValue, 'f', -1, 64)}
+	}
 }
