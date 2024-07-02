@@ -13,12 +13,49 @@ const DIGITS string = "0123456789"
 // ERRORS //
 
 type Error struct {
-	Error_Name string
-	Details    string
+	ErrorName string
+	Details   string
+	PosStart  *Position
+	PosEnd    *Position
 }
 
-func (e Error) as_string() string {
-	return fmt.Sprintf("(%s): (%s)", e.Error_Name, e.Details)
+func (e Error) asString() string {
+	result := fmt.Sprintf("%s: %s", e.ErrorName, e.Details)
+	result += fmt.Sprintf(" File %s, line %d", e.PosStart.Fn, e.PosStart.Ln+1)
+	return result
+}
+
+// POSITION //
+
+type Position struct {
+	Idx  int
+	Ln   int
+	Col  int
+	Fn   string
+	Ftxt string
+}
+
+func NewPosition(idx, ln, col int, fn, ftxt string) *Position {
+	return &Position{Idx: idx, Ln: ln, Col: col, Fn: fn, Ftxt: ftxt}
+}
+
+func (p *Position) asString() string {
+	return fmt.Sprintf("File %s, line %d", p.Fn, p.Ln+1)
+}
+
+
+func (p *Position) advance(currentChar byte) {
+	p.Idx++
+	p.Col++
+
+	if currentChar == '\n' {
+		p.Ln++
+		p.Col = 0
+	}
+}
+
+func (p *Position) copy() *Position {
+	return NewPosition(p.Idx, p.Ln, p.Col, p.Fn, p.Ftxt)
 }
 
 // TOKENS //
@@ -56,12 +93,13 @@ func (t Token) String() string {
 
 type Lexer struct {
 	Text        string
-	Pos         int
+	Pos         *Position
 	CurrentChar byte
+	Fn          string
 }
 
-func NewLexer(text string) *Lexer {
-	lexer := &Lexer{Text: text, Pos: 0}
+func NewLexer(fn, text string) *Lexer {
+	lexer := &Lexer{Text: text, Pos: NewPosition(0, 0, 0, fn, text), Fn: fn}
 	if len(text) > 0 {
 		lexer.CurrentChar = text[0]
 	} else {
@@ -71,20 +109,20 @@ func NewLexer(text string) *Lexer {
 }
 
 func (l *Lexer) advance() {
-	l.Pos++
-	if l.Pos < len(l.Text) {
-		l.CurrentChar = l.Text[l.Pos]
+	l.Pos.advance(l.CurrentChar)
+	if l.Pos.Idx < len(l.Text) {
+		l.CurrentChar = l.Text[l.Pos.Idx]
 	} else {
 		l.CurrentChar = 0 // None
 	}
 }
 
 func (l *Lexer) peek(length int) string {
-	endPos := l.Pos + length
+	endPos := l.Pos.Idx + length
 	if endPos >= len(l.Text) {
 		endPos = len(l.Text)
 	}
-	return l.Text[l.Pos:endPos]
+	return l.Text[l.Pos.Idx:endPos]
 }
 
 func (l *Lexer) make_tokens() ([]Token, error) {
@@ -115,9 +153,10 @@ func (l *Lexer) make_tokens() ([]Token, error) {
 			tokens = append(tokens, Token{Type: TT_RPAREN, Value: string(l.CurrentChar)})
 			l.advance()
 		} else {
+			posStart := l.Pos.copy()
 			char := string(l.CurrentChar)
 			l.advance()
-			err = fmt.Errorf("Unexpected Character: '%s'", char)
+			err = fmt.Errorf("%s: Unexpected Character: '%s'", posStart.asString(), char)
 			break
 		}
 	}
@@ -158,8 +197,8 @@ func (l *Lexer) make_number() Token {
 
 // RUN //
 
-func run(text string) ([]Token, error) {
-	lexer := NewLexer(text)
+func run(text string, fn string) ([]Token, error) {
+	lexer := NewLexer(fn, text)
 	tokens, err := lexer.make_tokens()
 	return tokens, err
 }

@@ -20,7 +20,7 @@ func main() {
 			return
 		}
 
-		tokens, err := run(input)
+		tokens, err := run(input, "<stdin>")
 		if err != nil {
 			fmt.Println(err)
 		} else {
