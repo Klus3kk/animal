@@ -1,4 +1,3 @@
-// shell.go
 package main
 
 import (
@@ -16,12 +15,19 @@ func main() {
 		input = strings.TrimSpace(input)
 		inputLower := strings.ToLower(input)
 
-		switch inputLower {
-		case "exit":
+		if inputLower == "exit" {
 			fmt.Println("Exiting...")
 			return
-		default:
-			fmt.Println("Text: ", input)
+		}
+
+		tokens, err := run(input)
+		if err != nil {
+			fmt.Println(err)
+		} else {
+			fmt.Println("Tokens:")
+			for _, token := range tokens {
+				fmt.Println(token)
+			}
 		}
 	}
 }

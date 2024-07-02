@@ -38,7 +38,6 @@ const (
 	TT_EOF    TokenType = "EOF" // End of file
 )
 
-// Class Token
 // Token represents a token with its type and value
 type Token struct {
 	Type  TokenType
@@ -61,6 +60,16 @@ type Lexer struct {
 	CurrentChar byte
 }
 
+func NewLexer(text string) *Lexer {
+	lexer := &Lexer{Text: text, Pos: 0}
+	if len(text) > 0 {
+		lexer.CurrentChar = text[0]
+	} else {
+		lexer.CurrentChar = 0
+	}
+	return lexer
+}
+
 func (l *Lexer) advance() {
 	l.Pos++
 	if l.Pos < len(l.Text) {
@@ -70,12 +79,12 @@ func (l *Lexer) advance() {
 	}
 }
 
-func (l *Lexer) make_tokens([]Token, error) {
+func (l *Lexer) make_tokens() ([]Token, error) { // Updated signature to include return types
 	tokens := []Token{}
 	var err error
 
 	for l.CurrentChar != 0 {
-		if l.CurrentChar == '\t' {
+		if l.CurrentChar == ' ' || l.CurrentChar == '\t' {
 			l.advance()
 		} else if strings.IndexByte(DIGITS, l.CurrentChar) != -1 {
 			tokens = append(tokens, l.make_number())
@@ -131,4 +140,12 @@ func (l *Lexer) make_number() Token {
 		floatValue, _ := strconv.ParseFloat(numStr, 64) // Convert numStr to float64
 		return Token{Type: TT_FLOAT, Value: strconv.FormatFloat(floatValue, 'f', -1, 64)}
 	}
+}
+
+// RUN //
+
+func run(text string) ([]Token, error) {
+	lexer := NewLexer(text)
+	tokens, err := lexer.make_tokens()
+	return tokens, err
 }
