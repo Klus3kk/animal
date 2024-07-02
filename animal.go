@@ -79,7 +79,15 @@ func (l *Lexer) advance() {
 	}
 }
 
-func (l *Lexer) make_tokens() ([]Token, error) { // Updated signature to include return types
+func (l *Lexer) peek(length int) string {
+	endPos := l.Pos + length
+	if endPos >= len(l.Text) {
+		endPos = len(l.Text)
+	}
+	return l.Text[l.Pos:endPos]
+}
+
+func (l *Lexer) make_tokens() ([]Token, error) {
 	tokens := []Token{}
 	var err error
 
@@ -88,18 +96,18 @@ func (l *Lexer) make_tokens() ([]Token, error) { // Updated signature to include
 			l.advance()
 		} else if strings.IndexByte(DIGITS, l.CurrentChar) != -1 {
 			tokens = append(tokens, l.make_number())
-		} else if l.CurrentChar == '+' {
-			tokens = append(tokens, Token{Type: TT_PLUS, Value: string(l.CurrentChar)})
-			l.advance()
-		} else if l.CurrentChar == '-' {
-			tokens = append(tokens, Token{Type: TT_MINUS, Value: string(l.CurrentChar)})
-			l.advance()
-		} else if l.CurrentChar == '*' {
-			tokens = append(tokens, Token{Type: TT_MUL, Value: string(l.CurrentChar)})
-			l.advance()
-		} else if l.CurrentChar == '/' {
-			tokens = append(tokens, Token{Type: TT_DIV, Value: string(l.CurrentChar)})
-			l.advance()
+		} else if l.peek(4) == "meow" {
+			tokens = append(tokens, Token{Type: TT_PLUS, Value: "meow"})
+			l.advanceBy(4)
+		} else if l.peek(4) == "woof" {
+			tokens = append(tokens, Token{Type: TT_MINUS, Value: "woof"})
+			l.advanceBy(4)
+		} else if l.peek(3) == "moo" {
+			tokens = append(tokens, Token{Type: TT_MUL, Value: "moo"})
+			l.advanceBy(3)
+		} else if l.peek(5) == "drone" {
+			tokens = append(tokens, Token{Type: TT_DIV, Value: "drone"})
+			l.advanceBy(5)
 		} else if l.CurrentChar == '(' {
 			tokens = append(tokens, Token{Type: TT_LPAREN, Value: string(l.CurrentChar)})
 			l.advance()
@@ -114,6 +122,12 @@ func (l *Lexer) make_tokens() ([]Token, error) { // Updated signature to include
 		}
 	}
 	return tokens, err
+}
+
+func (l *Lexer) advanceBy(count int) {
+	for i := 0; i < count; i++ {
+		l.advance()
+	}
 }
 
 func (l *Lexer) make_number() Token {
