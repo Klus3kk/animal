@@ -1,5 +1,11 @@
 # Aniimal
 A project to create a new programming language with unique features and applications. The basic functions, operators etc. will be correlated to animals (sounds, species etc.).
+You can test the language by writing:
+
+```
+./m
+```
+
 ## Features
 * Defining the syntax and semantics of the language.
 * Implementing a compiler or interpreter.
