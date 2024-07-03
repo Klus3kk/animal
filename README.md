@@ -1,4 +1,4 @@
-# Aniimal
+# Animal
 A project to create a new programming language with unique features and applications. The basic functions, operators etc. will be correlated to animals (sounds, species etc.).
 You can test the language by writing:
 

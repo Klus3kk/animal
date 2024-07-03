@@ -43,7 +43,6 @@ func (p *Position) asString() string {
 	return fmt.Sprintf("File %s, line %d", p.Fn, p.Ln+1)
 }
 
-
 func (p *Position) advance(currentChar byte) {
 	p.Idx++
 	p.Col++
@@ -193,6 +192,98 @@ func (l *Lexer) make_number() Token {
 		floatValue, _ := strconv.ParseFloat(numStr, 64) // Convert numStr to float64
 		return Token{Type: TT_FLOAT, Value: strconv.FormatFloat(floatValue, 'f', -1, 64)}
 	}
+}
+
+// NODES //
+// __init__
+
+type NumberNode struct {
+	Tok Token
+}
+
+// __repr__
+func (n NumberNode) String() string {
+	return fmt.Sprintf("(%s)", n.Tok)
+}
+
+type BinOpNode struct {
+	Left_Node  int
+	Op_Tok     Token
+	Right_Node int
+}
+
+func (b BinOpNode) String() string {
+	return fmt.Sprintf("(%d %s %d)", b.Left_Node, b.Op_Tok, b.Right_Node)
+}
+
+// PARSER //
+
+type Parser struct {
+	Tokens      []Token
+	Tok_Idx     int
+	Current_Tok Token
+}
+
+func NewParser(tokens []Token) *Parser {
+	parser := &Parser{Tokens: tokens, Tok_Idx: -1}
+	parser.advance()
+	return parser
+}
+
+func (p *Parser) advance() Token {
+	p.Tok_Idx++
+
+	if p.Tok_Idx < len(p.Tokens) {
+		p.Current_Tok = p.Tokens[p.Tok_Idx]
+	} else {
+		p.Current_Tok = Token{Type: TT_EOF}
+	}
+	return p.Current_Tok
+}
+
+func (p *Parser) factor() NumberNode {
+	tok := p.Current_Tok
+
+	if tok.Type == TT_INT || tok.Type == TT_FLOAT {
+		p.advance()
+		return NumberNode{Tok: tok}
+	} else if tok.Type == TT_LPAREN {
+		p.advance()
+		expr := p.expr()
+		if p.Current_Tok.Type == TT_RPAREN {
+			p.advance()
+			return expr
+		} else {
+			panic("Expected ')'")
+		}
+	}
+	panic("Expected int or float or (")
+}
+
+func (p *Parser) term() NumberNode {
+	left := p.factor()
+
+	for p.Current_Tok.Type == TT_MUL || p.Current_Tok.Type == TT_DIV {
+		op := p.Current_Tok
+		p.advance()
+		right := p.factor()
+		left = BinOpNode{Left_Node: left, Op_Tok: op, Right_Node: right}
+	}
+
+	return left
+}
+
+func (p *Parser) expr() NumberNode {
+	left := p.term()
+
+	for p.Current_Tok.Type == TT_PLUS || p.Current_Tok.Type == TT_MINUS {
+		op := p.Current_Tok
+		p.advance()
+		right := p.term()
+		left = BinOpNode{Left_Node: left, Op_Tok: op, Right_Node: right}
+	}
+
+	return left
 }
 
 // RUN //
