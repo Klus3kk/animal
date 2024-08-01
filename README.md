@@ -13,7 +13,7 @@ You can test the language by writing:
 * Writing sample programs.
 ## Technologies 
 * Go language,
-* Lexers, tokens, 
+* Lexers, tokens
 ## Instruction
 Operators:
 * "*" - moo
