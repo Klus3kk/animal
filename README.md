@@ -12,7 +12,7 @@ You can test the language by writing:
 * Creating standard libraries.
 * Writing sample programs.
 ## Technologies 
-* Go language,
+* Go language
 * Lexers, tokens
 ## Instruction
 Operators:
