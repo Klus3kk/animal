@@ -69,7 +69,7 @@ const (
 	TT_MINUS  TokenType = "MINUS"
 	TT_MUL    TokenType = "MUL"
 	TT_DIV    TokenType = "DIV"
-	TT_MOD    TokenType = "MOD"
+	TT_MOD	  TokenType = "MOD"
 	TT_LPAREN TokenType = "LPAREN"
 	TT_RPAREN TokenType = "RPAREN"
 	TT_EOF    TokenType = "EOF" // End of file
@@ -146,9 +146,9 @@ func (l *Lexer) make_tokens() ([]Token, error) {
 		} else if l.peek(5) == "drone" {
 			tokens = append(tokens, Token{Type: TT_DIV, Value: "drone"})
 			l.advanceBy(5)
-		} else if l.peek(6) == "squeak" {
+		} else if l.peek(5) == "squeak" {
 			tokens = append(tokens, Token{Type: TT_MOD, Value: "squeak"})
-			l.advanceBy(6)
+			l.advanceBy(5)
 		} else if l.CurrentChar == '(' {
 			tokens = append(tokens, Token{Type: TT_LPAREN, Value: string(l.CurrentChar)})
 			l.advance()
@@ -245,50 +245,50 @@ func (p *Parser) advance() Token {
 	return p.Current_Tok
 }
 
-// func (p *Parser) factor() NumberNode {
-// 	tok := p.Current_Tok
+func (p *Parser) factor() NumberNode {
+	tok := p.Current_Tok
 
-// 	if tok.Type == TT_INT || tok.Type == TT_FLOAT {
-// 		p.advance()
-// 		return NumberNode{Tok: tok}
-// 	} else if tok.Type == TT_LPAREN {
-// 		p.advance()
-// 		expr := p.expr()
-// 		if p.Current_Tok.Type == TT_RPAREN {
-// 			p.advance()
-// 			return expr
-// 		} else {
-// 			panic("Expected ')'")
-// 		}
-// 	}
-// 	panic("Expected int or float or (")
-// }
+	if tok.Type == TT_INT || tok.Type == TT_FLOAT {
+		p.advance()
+		return NumberNode{Tok: tok}
+	} else if tok.Type == TT_LPAREN {
+		p.advance()
+		expr := p.expr()
+		if p.Current_Tok.Type == TT_RPAREN {
+			p.advance()
+			return expr
+		} else {
+			panic("Expected ')'")
+		}
+	}
+	panic("Expected int or float or (")
+}
 
-// func (p *Parser) term() NumberNode {
-// 	left := p.factor()
+func (p *Parser) term() NumberNode {
+	left := p.factor()
 
-// 	for p.Current_Tok.Type == TT_MUL || p.Current_Tok.Type == TT_DIV {
-// 		op := p.Current_Tok
-// 		p.advance()
-// 		right := p.factor()
-// 		left = BinOpNode{Left_Node: left, Op_Tok: op, Right_Node: right}
-// 	}
+	for p.Current_Tok.Type == TT_MUL || p.Current_Tok.Type == TT_DIV {
+		op := p.Current_Tok
+		p.advance()
+		right := p.factor()
+		left = BinOpNode{Left_Node: left, Op_Tok: op, Right_Node: right}
+	}
 
-// 	return left
-// }
+	return left
+}
 
-// func (p *Parser) expr() NumberNode {
-// 	left := p.term()
+func (p *Parser) expr() NumberNode {
+	left := p.term()
 
-// 	for p.Current_Tok.Type == TT_PLUS || p.Current_Tok.Type == TT_MINUS {
-// 		op := p.Current_Tok
-// 		p.advance()
-// 		right := p.term()
-// 		left = BinOpNode{Left_Node: left, Op_Tok: op, Right_Node: right}
-// 	}
+	for p.Current_Tok.Type == TT_PLUS || p.Current_Tok.Type == TT_MINUS {
+		op := p.Current_Tok
+		p.advance()
+		right := p.term()
+		left = BinOpNode{Left_Node: left, Op_Tok: op, Right_Node: right}
+	}
 
-// 	return left
-// }
+	return left
+}
 
 // RUN //
 

@@ -146,9 +146,9 @@ func (l *Lexer) make_tokens() ([]Token, error) {
 		} else if l.peek(5) == "drone" {
 			tokens = append(tokens, Token{Type: TT_DIV, Value: "drone"})
 			l.advanceBy(5)
-		} else if l.peek(6) == "squeak" {
+		} else if l.peek(5) == "squeak" {
 			tokens = append(tokens, Token{Type: TT_MOD, Value: "squeak"})
-			l.advanceBy(6)
+			l.advanceBy(5)
 		} else if l.CurrentChar == '(' {
 			tokens = append(tokens, Token{Type: TT_LPAREN, Value: string(l.CurrentChar)})
 			l.advance()

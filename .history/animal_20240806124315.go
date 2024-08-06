@@ -146,9 +146,9 @@ func (l *Lexer) make_tokens() ([]Token, error) {
 		} else if l.peek(5) == "drone" {
 			tokens = append(tokens, Token{Type: TT_DIV, Value: "drone"})
 			l.advanceBy(5)
-		} else if l.peek(6) == "squeak" {
+		} else if l.peek(5) == "squeak" {
 			tokens = append(tokens, Token{Type: TT_MOD, Value: "squeak"})
-			l.advanceBy(6)
+			l.advanceBy(5)
 		} else if l.CurrentChar == '(' {
 			tokens = append(tokens, Token{Type: TT_LPAREN, Value: string(l.CurrentChar)})
 			l.advance()
@@ -245,24 +245,24 @@ func (p *Parser) advance() Token {
 	return p.Current_Tok
 }
 
-// func (p *Parser) factor() NumberNode {
-// 	tok := p.Current_Tok
+func (p *Parser) factor() NumberNode {
+	tok := p.Current_Tok
 
-// 	if tok.Type == TT_INT || tok.Type == TT_FLOAT {
-// 		p.advance()
-// 		return NumberNode{Tok: tok}
-// 	} else if tok.Type == TT_LPAREN {
-// 		p.advance()
-// 		expr := p.expr()
-// 		if p.Current_Tok.Type == TT_RPAREN {
-// 			p.advance()
-// 			return expr
-// 		} else {
-// 			panic("Expected ')'")
-// 		}
-// 	}
-// 	panic("Expected int or float or (")
-// }
+	if tok.Type == TT_INT || tok.Type == TT_FLOAT {
+		p.advance()
+		return NumberNode{Tok: tok}
+	} else if tok.Type == TT_LPAREN {
+		p.advance()
+		expr := p.expr()
+		if p.Current_Tok.Type == TT_RPAREN {
+			p.advance()
+			return expr
+		} else {
+			panic("Expected ')'")
+		}
+	}
+	panic("Expected int or float or (")
+}
 
 // func (p *Parser) term() NumberNode {
 // 	left := p.factor()
