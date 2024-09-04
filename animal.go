@@ -72,8 +72,12 @@ const (
 	TT_DIV    TokenType = "DIV"
 	TT_MOD    TokenType = "MOD"
 	TT_EXP    TokenType = "EXP"
-	TT_LPAREN TokenType = "LPAREN"
-	TT_RPAREN TokenType = "RPAREN"
+	TT_LROUNDBR TokenType = "LROUNDBR"
+	TT_RROUNDBR TokenType = "RROUNDBR"
+	TT_RSQRBR TokenType = "RSQRBR"
+	TT_LSQRBR TokenType = "LSQRBR"
+	TT_RCURLBR TokenType = "RCURLBR"
+	TT_LCURLBR TokenType = "LCURLBR"
 	TT_EOF    TokenType = "EOF" // End of file
 )
 
@@ -155,10 +159,22 @@ func (l *Lexer) make_tokens() ([]Token, error) {
 			tokens = append(tokens, Token{Type: TT_EXP, Value: "soar"})
 			l.advanceBy(4)
 		} else if l.CurrentChar == '(' {
-			tokens = append(tokens, Token{Type: TT_LPAREN, Value: string(l.CurrentChar)})
+			tokens = append(tokens, Token{Type: TT_LROUNDBR, Value: string(l.CurrentChar)})
 			l.advance()
 		} else if l.CurrentChar == ')' {
-			tokens = append(tokens, Token{Type: TT_RPAREN, Value: string(l.CurrentChar)})
+			tokens = append(tokens, Token{Type: TT_RROUNDBR, Value: string(l.CurrentChar)})
+			l.advance()
+		} else if l.CurrentChar == '[' {
+			tokens = append(tokens, Token{Type: TT_LSQRBR, Value: string(l.CurrentChar)})
+			l.advance()
+		} else if l.CurrentChar == ']' {
+			tokens = append(tokens, Token{Type: TT_RSQRBR, Value: string(l.CurrentChar)})
+			l.advance()
+		} else if l.CurrentChar == '{' {
+			tokens = append(tokens, Token{Type: TT_LCURLBR, Value: string(l.CurrentChar)})
+			l.advance()
+		} else if l.CurrentChar == '}' {
+			tokens = append(tokens, Token{Type: TT_RCURLBR, Value: string(l.CurrentChar)})
 			l.advance()
 		} else {
 			posStart := l.Pos.copy()
