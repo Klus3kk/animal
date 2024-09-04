@@ -65,11 +65,13 @@ type TokenType string
 const (
 	TT_INT    TokenType = "INT"
 	TT_FLOAT  TokenType = "FLOAT"
+	TT_BOOL   TokenType = "BOOL"
 	TT_PLUS   TokenType = "PLUS"
 	TT_MINUS  TokenType = "MINUS"
 	TT_MUL    TokenType = "MUL"
 	TT_DIV    TokenType = "DIV"
 	TT_MOD    TokenType = "MOD"
+	TT_EXP    TokenType = "EXP"
 	TT_LPAREN TokenType = "LPAREN"
 	TT_RPAREN TokenType = "RPAREN"
 	TT_EOF    TokenType = "EOF" // End of file
@@ -129,7 +131,7 @@ func (l *Lexer) make_tokens() ([]Token, error) {
 	tokens := []Token{}
 	var err error
 
-	for l.CurrentChar != 0 {
+	for l.CurrentChar != 0 { // while current character isn't None
 		if l.CurrentChar == ' ' || l.CurrentChar == '\t' {
 			l.advance()
 		} else if strings.IndexByte(DIGITS, l.CurrentChar) != -1 {
@@ -149,6 +151,9 @@ func (l *Lexer) make_tokens() ([]Token, error) {
 		} else if l.peek(6) == "squeak" {
 			tokens = append(tokens, Token{Type: TT_MOD, Value: "squeak"})
 			l.advanceBy(6)
+		} else if l.peek(4) == "soar" {
+			tokens = append(tokens, Token{Type: TT_EXP, Value: "soar"})
+			l.advanceBy(4)
 		} else if l.CurrentChar == '(' {
 			tokens = append(tokens, Token{Type: TT_LPAREN, Value: string(l.CurrentChar)})
 			l.advance()
