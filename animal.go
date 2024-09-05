@@ -63,22 +63,23 @@ func (p *Position) copy() *Position {
 type TokenType string
 
 const (
-	TT_INT    TokenType = "INT"
-	TT_FLOAT  TokenType = "FLOAT"
-	TT_BOOL   TokenType = "BOOL"
-	TT_PLUS   TokenType = "PLUS"
-	TT_MINUS  TokenType = "MINUS"
-	TT_MUL    TokenType = "MUL"
-	TT_DIV    TokenType = "DIV"
-	TT_MOD    TokenType = "MOD"
-	TT_EXP    TokenType = "EXP"
+	TT_INT      TokenType = "INT"
+	TT_FLOAT    TokenType = "FLOAT"
+	TT_BOOL     TokenType = "BOOL"
+	TT_STRING   TokenType = "STRING"
+	TT_PLUS     TokenType = "PLUS"
+	TT_MINUS    TokenType = "MINUS"
+	TT_MUL      TokenType = "MUL"
+	TT_DIV      TokenType = "DIV"
+	TT_MOD      TokenType = "MOD"
+	TT_EXP      TokenType = "EXP"
 	TT_LROUNDBR TokenType = "LROUNDBR"
 	TT_RROUNDBR TokenType = "RROUNDBR"
-	TT_RSQRBR TokenType = "RSQRBR"
-	TT_LSQRBR TokenType = "LSQRBR"
-	TT_RCURLBR TokenType = "RCURLBR"
-	TT_LCURLBR TokenType = "LCURLBR"
-	TT_EOF    TokenType = "EOF" // End of file
+	TT_RSQRBR   TokenType = "RSQRBR"
+	TT_LSQRBR   TokenType = "LSQRBR"
+	TT_RCURLBR  TokenType = "RCURLBR"
+	TT_LCURLBR  TokenType = "LCURLBR"
+	TT_EOF      TokenType = "EOF" // End of file
 )
 
 // Token represents a token with its type and value
@@ -141,22 +142,22 @@ func (l *Lexer) make_tokens() ([]Token, error) {
 		} else if strings.IndexByte(DIGITS, l.CurrentChar) != -1 {
 			tokens = append(tokens, l.make_number())
 		} else if l.peek(4) == "meow" {
-			tokens = append(tokens, Token{Type: TT_PLUS, Value: "meow"})
+			tokens = append(tokens, Token{Type: TT_PLUS, Value: "PLUS"})
 			l.advanceBy(4)
 		} else if l.peek(4) == "woof" {
-			tokens = append(tokens, Token{Type: TT_MINUS, Value: "woof"})
+			tokens = append(tokens, Token{Type: TT_MINUS, Value: "MINUS"})
 			l.advanceBy(4)
 		} else if l.peek(3) == "moo" {
-			tokens = append(tokens, Token{Type: TT_MUL, Value: "moo"})
+			tokens = append(tokens, Token{Type: TT_MUL, Value: "MUL"})
 			l.advanceBy(3)
 		} else if l.peek(5) == "drone" {
-			tokens = append(tokens, Token{Type: TT_DIV, Value: "drone"})
+			tokens = append(tokens, Token{Type: TT_DIV, Value: "DIV"})
 			l.advanceBy(5)
 		} else if l.peek(6) == "squeak" {
-			tokens = append(tokens, Token{Type: TT_MOD, Value: "squeak"})
+			tokens = append(tokens, Token{Type: TT_MOD, Value: "MOD"})
 			l.advanceBy(6)
 		} else if l.peek(4) == "soar" {
-			tokens = append(tokens, Token{Type: TT_EXP, Value: "soar"})
+			tokens = append(tokens, Token{Type: TT_EXP, Value: "EXP"})
 			l.advanceBy(4)
 		} else if l.CurrentChar == '(' {
 			tokens = append(tokens, Token{Type: TT_LROUNDBR, Value: string(l.CurrentChar)})
@@ -220,25 +221,24 @@ func (l *Lexer) make_number() Token {
 }
 
 // NODES //
-// __init__
+// __init__ (self, tok)
 
 type NumberNode struct {
 	Tok Token
 }
 
-// __repr__
 func (n NumberNode) String() string {
-	return fmt.Sprintf("(%s)", n.Tok)
+	return fmt.Sprintf("(%s: %s)", n.Tok.Type, n.Tok.Value)
 }
 
 type BinOpNode struct {
-	Left_Node  int
+	Left_Node  interface{}
 	Op_Tok     Token
-	Right_Node int
+	Right_Node interface{}
 }
 
 func (b BinOpNode) String() string {
-	return fmt.Sprintf("(%d %s %d)", b.Left_Node, b.Op_Tok, b.Right_Node)
+	return fmt.Sprintf("(%s %s %s)", b.Left_Node, b.Op_Tok.Value, b.Right_Node)
 }
 
 // PARSER //
@@ -266,55 +266,78 @@ func (p *Parser) advance() Token {
 	return p.Current_Tok
 }
 
-// func (p *Parser) factor() NumberNode {
-// 	tok := p.Current_Tok
+////////////
 
-// 	if tok.Type == TT_INT || tok.Type == TT_FLOAT {
-// 		p.advance()
-// 		return NumberNode{Tok: tok}
-// 	} else if tok.Type == TT_LPAREN {
-// 		p.advance()
-// 		expr := p.expr()
-// 		if p.Current_Tok.Type == TT_RPAREN {
-// 			p.advance()
-// 			return expr
-// 		} else {
-// 			panic("Expected ')'")
-// 		}
-// 	}
-// 	panic("Expected int or float or (")
-// }
+func (p *Parser) parse() interface{} {
+	res := p.expr()
+	return res
+}
 
-// func (p *Parser) term() NumberNode {
-// 	left := p.factor()
+func (p *Parser) factor() interface{} {
+	tok := p.Current_Tok
 
-// 	for p.Current_Tok.Type == TT_MUL || p.Current_Tok.Type == TT_DIV {
-// 		op := p.Current_Tok
-// 		p.advance()
-// 		right := p.factor()
-// 		left = BinOpNode{Left_Node: left, Op_Tok: op, Right_Node: right}
-// 	}
+	if tok.Type == TT_INT || tok.Type == TT_FLOAT {
+		p.advance()
+		return NumberNode{Tok: tok}
+	} else if tok.Type == TT_LROUNDBR {
+		p.advance()
+		expr := p.expr()
+		if p.Current_Tok.Type == TT_RROUNDBR {
+			p.advance()
+			return expr
+		} else {
+			panic("Expected ')'")
+		}
+	}
+	panic("Expected int or float or (")
+}
 
-// 	return left
-// }
+func (p *Parser) term() interface{} {
+	return p.bin_op(p.factor, []TokenType{TT_MUL, TT_DIV})
+}
 
-// func (p *Parser) expr() NumberNode {
-// 	left := p.term()
+func (p *Parser) expr() interface{} {
+	return p.bin_op(p.term, []TokenType{TT_PLUS, TT_MINUS})
+}
 
-// 	for p.Current_Tok.Type == TT_PLUS || p.Current_Tok.Type == TT_MINUS {
-// 		op := p.Current_Tok
-// 		p.advance()
-// 		right := p.term()
-// 		left = BinOpNode{Left_Node: left, Op_Tok: op, Right_Node: right}
-// 	}
+////////////
 
-// 	return left
-// }
+func (p *Parser) bin_op(Func func() interface{}, ops []TokenType) interface{} {
+	left := Func()
+
+	for p.Current_Tok.Type != TT_EOF && contains(ops, p.Current_Tok.Type) {
+		op_tok := p.Current_Tok
+		p.advance()
+		right := Func()
+		left = BinOpNode{Left_Node: left, Op_Tok: op_tok, Right_Node: right}
+	}
+
+	return left
+}
+
+// Utility function to check if a TokenType is in the list
+func contains(ops []TokenType, op TokenType) bool {
+	for _, val := range ops {
+		if val == op {
+			return true
+		}
+	}
+	return false
+}
 
 // RUN //
 
-func run(text string, fn string) ([]Token, error) {
+func run(text string, fn string) (interface{}, error) {
+	// Generate Tokens
 	lexer := NewLexer(fn, text)
 	tokens, err := lexer.make_tokens()
-	return tokens, err
+	if err != nil {
+		return nil, err
+	}
+
+	// Generate AST
+	parser := NewParser(tokens)
+	ast := parser.expr()
+
+	return ast, nil
 }

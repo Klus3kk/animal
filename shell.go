@@ -20,14 +20,12 @@ func main() {
 			return
 		}
 
-		tokens, err := run(input, "<stdin>")
+		// Now run returns an AST instead of tokens
+		ast, err := run(input, "<stdin>")
 		if err != nil {
 			fmt.Println(err)
 		} else {
-			fmt.Println("Tokens:")
-			for _, token := range tokens {
-				fmt.Println(token)
-			}
+			fmt.Println(ast) // Print the AST
 		}
 	}
 }
