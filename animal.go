@@ -101,6 +101,8 @@ const (
 	TT_STRING   TokenType = "STRING"
 	TT_PLUS     TokenType = "PLUS"
 	TT_MINUS    TokenType = "MINUS"
+	TT_NEG      TokenType = "NEG"
+	TT_POS      TokenType = "POS"
 	TT_MUL      TokenType = "MUL"
 	TT_DIV      TokenType = "DIV"
 	TT_MOD      TokenType = "MOD"
@@ -215,6 +217,16 @@ func (l *Lexer) make_tokens() ([]Token, error) {
 			l.advance()
 			posEnd := l.Pos.copy()
 			tokens = append(tokens, Token{Type: TT_RROUNDBR, Value: string(l.CurrentChar), Pos_Start: posStart, Pos_End: posEnd})
+		} else if l.CurrentChar == '-' {
+			posStart := l.Pos.copy()
+			l.advance()
+			posEnd := l.Pos.copy()
+			tokens = append(tokens, Token{Type: TT_NEG, Value: string(l.CurrentChar), Pos_Start: posStart, Pos_End: posEnd})
+		} else if l.CurrentChar == '+' {
+			posStart := l.Pos.copy()
+			l.advance()
+			posEnd := l.Pos.copy()
+			tokens = append(tokens, Token{Type: TT_POS, Value: string(l.CurrentChar), Pos_Start: posStart, Pos_End: posEnd})
 		} else {
 			// Handling illegal characters
 			posStart := l.Pos.copy()
@@ -239,8 +251,8 @@ func (l *Lexer) make_number() Token {
 	dotCount := 0
 	Pos_Start := l.Pos.copy()
 
-	if l.CurrentChar == '-' {
-		numStr += "-"
+	if l.CurrentChar == '-' || l.CurrentChar == '+' {
+		numStr += string(l.CurrentChar)
 		l.advance()
 	}
 
@@ -293,7 +305,7 @@ type UnaryOpNode struct {
 }
 
 func (u UnaryOpNode) String() string { // __repr__
-	return fmt.Sprintf("(%s %s)", u.Op_Tok.Value, u.Node)
+	return fmt.Sprintf("(%s %s)", u.Op_Tok.Type, u.Node)
 }
 
 // PARSE RESULT //
@@ -348,40 +360,48 @@ func (p *Parser) advance() Token {
 	return p.Current_Tok
 }
 
-////////////
-
 func (p *Parser) parse() *ParseResult {
 	res := p.expr()
 	if res.Error == "" && p.Current_Tok.Type != TT_EOF {
 		return res.failure(NewInvalidSyntaxError(
 			p.Current_Tok.Pos_Start, p.Current_Tok.Pos_End,
-			"Expected '+', '-', '*', '/'",
+			"Expected 'meow', 'woof', 'moo', 'drone'",
 		).asString())
 	}
 	return res
 }
 
+////////////
+
 func (p *Parser) factor() *ParseResult {
 	res := &ParseResult{}
 	tok := p.Current_Tok
 
-	if tok.Type == TT_INT || tok.Type == TT_FLOAT {
+	if tok.Type == TT_POS || tok.Type == TT_NEG {
+		// Advance the token, but don't register it as a *ParseResult
 		p.advance()
+		factor := res.register(p.factor())
+		if res.Error != "" {
+			return res
+		}
+		return res.success(UnaryOpNode{Op_Tok: tok, Node: factor})
+	} else if tok.Type == TT_INT || tok.Type == TT_FLOAT {
+		p.advance() // No need to register, just advance
 		return res.success(NumberNode{Tok: tok})
 	} else if tok.Type == TT_LROUNDBR {
-		p.advance()
-		exprRes := p.expr()
-		if exprRes.Error != "" {
-			return exprRes
+		p.advance() // same here
+		expr := p.expr()
+		if expr.Error != "" {
+			return res.failure(expr.Error)
 		}
 		if p.Current_Tok.Type == TT_RROUNDBR {
-			p.advance()
-			return res.success(exprRes.Node)
+			p.advance() // -||-
+			return res.success(expr.Node)
 		} else {
 			return res.failure("Expected ')'")
 		}
 	}
-	return res.failure("Expected int, float, or '('")
+	return res.failure("Expected int, float, '+', '-', or '('")
 }
 
 func (p *Parser) term() *ParseResult {
@@ -442,7 +462,7 @@ func run(text string, fn string) (interface{}, error) {
 	// Generate Tokens
 	lexer := NewLexer(fn, text)
 	tokens, err := lexer.make_tokens()
-	if err != nil {
+	if err != nil { // if error: return None, error
 		return nil, err
 	}
 
