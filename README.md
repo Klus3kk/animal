@@ -38,6 +38,5 @@ Brackets:
 * [] - square,
 * {} - curly.
 
-<br>
 
 **Status: In progress.**
