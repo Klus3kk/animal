@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 )
@@ -95,25 +96,26 @@ func (p *Position) copy() *Position {
 type TokenType string
 
 const (
-	TT_INT      TokenType = "INT"
-	TT_FLOAT    TokenType = "FLOAT"
-	TT_BOOL     TokenType = "BOOL"
-	TT_STRING   TokenType = "STRING"
-	TT_PLUS     TokenType = "PLUS"
-	TT_MINUS    TokenType = "MINUS"
-	TT_NEG      TokenType = "NEG"
-	TT_POS      TokenType = "POS"
-	TT_MUL      TokenType = "MUL"
-	TT_DIV      TokenType = "DIV"
-	TT_MOD      TokenType = "MOD"
-	TT_EXP      TokenType = "EXP"
-	TT_LROUNDBR TokenType = "LROUNDBR"
-	TT_RROUNDBR TokenType = "RROUNDBR"
-	TT_RSQRBR   TokenType = "RSQRBR"
-	TT_LSQRBR   TokenType = "LSQRBR"
-	TT_RCURLBR  TokenType = "RCURLBR"
-	TT_LCURLBR  TokenType = "LCURLBR"
-	TT_EOF      TokenType = "EOF" 
+	TT_INT      TokenType = "INT"      //
+	TT_FLOAT    TokenType = "FLOAT"    //
+	TT_BOOL     TokenType = "BOOL"     //
+	TT_STRING   TokenType = "STRING"   //
+	TT_PLUS     TokenType = "PLUS"     //
+	TT_MINUS    TokenType = "MINUS"    //
+	TT_NEG      TokenType = "NEG"      //
+	TT_POS      TokenType = "POS"      //
+	TT_MUL      TokenType = "MUL"      //
+	TT_DIV      TokenType = "DIV"      //
+	TT_MOD      TokenType = "MOD"      //
+	TT_EXP      TokenType = "EXP"      //
+	TT_CONC     TokenType = "CONC"     //
+	TT_LROUNDBR TokenType = "LROUNDBR" //
+	TT_RROUNDBR TokenType = "RROUNDBR" //
+	TT_RSQRBR   TokenType = "RSQRBR"   //
+	TT_LSQRBR   TokenType = "LSQRBR"   //
+	TT_RCURLBR  TokenType = "RCURLBR"  //
+	TT_LCURLBR  TokenType = "LCURLBR"  //
+	TT_EOF      TokenType = "EOF"      //
 )
 
 // Token represents a token with its type and value
@@ -211,6 +213,11 @@ func (l *Lexer) make_tokens() ([]Token, error) {
 			l.advanceBy(4)
 			posEnd := l.Pos.copy()
 			tokens = append(tokens, Token{Type: TT_EXP, Value: "EXP", Pos_Start: posStart, Pos_End: posEnd})
+		} else if l.peek(4) == "purr" {
+			posStart := l.Pos.copy()
+			l.advanceBy(4)
+			posEnd := l.Pos.copy()
+			tokens = append(tokens, Token{Type: TT_CONC, Value: "CONC", Pos_Start: posStart, Pos_End: posEnd})
 		} else if l.CurrentChar == '(' {
 			posStart := l.Pos.copy()
 			l.advance()
@@ -221,6 +228,22 @@ func (l *Lexer) make_tokens() ([]Token, error) {
 			l.advance()
 			posEnd := l.Pos.copy()
 			tokens = append(tokens, Token{Type: TT_RROUNDBR, Value: string(l.CurrentChar), Pos_Start: posStart, Pos_End: posEnd})
+		} else if l.CurrentChar == '[' {
+			posStart := l.Pos.copy()
+			l.advance()
+			tokens = append(tokens, Token{Type: TT_LSQRBR, Value: "[", Pos_Start: posStart, Pos_End: l.Pos.copy()})
+		} else if l.CurrentChar == ']' {
+			posStart := l.Pos.copy()
+			l.advance()
+			tokens = append(tokens, Token{Type: TT_RSQRBR, Value: "]", Pos_Start: posStart, Pos_End: l.Pos.copy()})
+		} else if l.CurrentChar == '{' {
+			posStart := l.Pos.copy()
+			l.advance()
+			tokens = append(tokens, Token{Type: TT_LCURLBR, Value: "{", Pos_Start: posStart, Pos_End: l.Pos.copy()})
+		} else if l.CurrentChar == '}' {
+			posStart := l.Pos.copy()
+			l.advance()
+			tokens = append(tokens, Token{Type: TT_RCURLBR, Value: "}", Pos_Start: posStart, Pos_End: l.Pos.copy()})
 		} else if l.CurrentChar == '-' {
 			posStart := l.Pos.copy()
 			l.advance()
@@ -421,44 +444,67 @@ func (p *Parser) parse() *ParseResult {
 ////////////
 
 func (p *Parser) factor() *ParseResult {
-    res := &ParseResult{}
-    tok := p.Current_Tok
+	res := &ParseResult{}
+	tok := p.Current_Tok
 
-    if tok.Type == TT_POS || tok.Type == TT_NEG {
-        p.advance()
-        factor := res.register(p.factor())
-        if res.Error != "" {
-            return res
-        }
-        return res.success(UnaryOpNode{Op_Tok: tok, Node: factor})
-    } else if tok.Type == TT_INT || tok.Type == TT_FLOAT {
-        p.advance()
-        return res.success(NumberNode{Tok: tok})
-    } else if tok.Type == TT_BOOL {
-        p.advance()
-        return res.success(BoolNode{Tok: tok})
-    } else if tok.Type == TT_STRING {
-        p.advance()
-        return res.success(StringNode{Tok: tok})
-    } else if tok.Type == TT_LROUNDBR {
-        p.advance()
-        expr := p.expr()
-        if expr.Error != "" {
-            return res.failure(expr.Error)
-        }
-        if p.Current_Tok.Type == TT_RROUNDBR {
-            p.advance()
-            return res.success(expr.Node)
-        } else {
-            return res.failure("Expected ')'")
-        }
-    }
-    return res.failure("Expected int, float, boolean, string, '+', '-', or '('")
+	if tok.Type == TT_POS || tok.Type == TT_NEG {
+		p.advance()
+		factor := res.register(p.factor())
+		if res.Error != "" {
+			return res
+		}
+		return res.success(UnaryOpNode{Op_Tok: tok, Node: factor})
+	} else if tok.Type == TT_INT || tok.Type == TT_FLOAT {
+		p.advance()
+		return res.success(NumberNode{Tok: tok})
+	} else if tok.Type == TT_BOOL {
+		p.advance()
+		return res.success(BoolNode{Tok: tok})
+	} else if tok.Type == TT_STRING {
+		p.advance()
+		return res.success(StringNode{Tok: tok})
+	} else if tok.Type == TT_LROUNDBR {
+		p.advance()
+		expr := p.expr()
+		if expr.Error != "" {
+			return res.failure(expr.Error)
+		}
+		if p.Current_Tok.Type == TT_RROUNDBR {
+			p.advance()
+			return res.success(expr.Node)
+		} else {
+			return res.failure("Expected ')'")
+		}
+	} else if tok.Type == TT_LSQRBR {
+		p.advance()
+		expr := p.expr()
+		if expr.Error != "" {
+			return res.failure(expr.Error)
+		}
+		if p.Current_Tok.Type == TT_RSQRBR {
+			p.advance()
+			return res.success(expr.Node)
+		} else {
+			return res.failure("Expected ']'")
+		}
+	} else if tok.Type == TT_LCURLBR {
+		p.advance()
+		expr := p.expr()
+		if expr.Error != "" {
+			return res.failure(expr.Error)
+		}
+		if p.Current_Tok.Type == TT_RCURLBR {
+			p.advance()
+			return res.success(expr.Node)
+		} else {
+			return res.failure("Expected '}'")
+		}
+	}
+	return res.failure("Expected int, float, boolean, string, '+', '-', '(', '[', '{'")
 }
 
-
 func (p *Parser) term() *ParseResult {
-	return p.bin_op(p.factor, []TokenType{TT_MUL, TT_DIV})
+	return p.bin_op(p.factor, []TokenType{TT_MUL, TT_DIV, TT_MOD, TT_EXP, TT_CONC})
 }
 
 func (p *Parser) expr() *ParseResult {
@@ -518,19 +564,19 @@ func (i Interpreter) visit(node interface{}) (interface{}, error) {
 		kinda
 	*/
 	switch node := node.(type) {
-    case NumberNode:
-        return i.visitNumberNode(node)
-    case BinOpNode:
-        return i.visitBinOpNode(node)
-    case UnaryOpNode:
-        return i.visitUnaryOpNode(node)
-    case StringNode:
-        return i.visitStringNode(node)
-    case BoolNode:
-        return i.visitBoolNode(node)
-    default:
-        return nil, fmt.Errorf("No visit method for node type %T", node)
-    }
+	case NumberNode:
+		return i.visitNumberNode(node)
+	case BinOpNode:
+		return i.visitBinOpNode(node)
+	case UnaryOpNode:
+		return i.visitUnaryOpNode(node)
+	case StringNode:
+		return i.visitStringNode(node)
+	case BoolNode:
+		return i.visitBoolNode(node)
+	default:
+		return nil, fmt.Errorf("No visit method for node type %T", node)
+	}
 }
 
 // Visit methods
@@ -554,7 +600,7 @@ func (i Interpreter) visitNumberNode(node NumberNode) (interface{}, error) {
 }
 
 func (i Interpreter) visitBinOpNode(node BinOpNode) (interface{}, error) {
-	// Evaluate the left and right nodes, assume both are float64
+	// Evaluate the left and right nodes
 	leftVal, err := i.visit(node.Left_Node)
 	if err != nil {
 		return nil, err
@@ -565,26 +611,46 @@ func (i Interpreter) visitBinOpNode(node BinOpNode) (interface{}, error) {
 		return nil, err
 	}
 
-	// Convert to float64 before operations to handle both int and float
-	leftFloat := leftVal.(float64)
-	rightFloat := rightVal.(float64)
-
 	// Apply the operator based on node.Op_Tok
 	switch node.Op_Tok.Type {
-	case TT_PLUS:
-		return leftFloat + rightFloat, nil
-	case TT_MINUS:
-		return leftFloat - rightFloat, nil
-	case TT_MUL:
-		return leftFloat * rightFloat, nil
-	case TT_DIV:
-		if rightFloat == 0 {
-			return nil, fmt.Errorf("ERROR: Division by zero")
+	case TT_PLUS, TT_MINUS, TT_MUL, TT_DIV, TT_MOD, TT_EXP:
+		// Handle arithmetic operations
+		leftFloat, okLeft := leftVal.(float64)
+		rightFloat, okRight := rightVal.(float64)
+		if !okLeft || !okRight {
+			return nil, fmt.Errorf("Expected numbers for arithmetic operations")
 		}
-		return leftFloat / rightFloat, nil
+
+		switch node.Op_Tok.Type {
+		case TT_PLUS:
+			return leftFloat + rightFloat, nil
+		case TT_MINUS:
+			return leftFloat - rightFloat, nil
+		case TT_MUL:
+			return leftFloat * rightFloat, nil
+		case TT_DIV:
+			if rightFloat == 0 {
+				return nil, fmt.Errorf("ERROR: Division by zero")
+			}
+			return leftFloat / rightFloat, nil
+		case TT_MOD:
+			return math.Mod(leftFloat, rightFloat), nil
+		case TT_EXP:
+			return math.Pow(leftFloat, rightFloat), nil
+		}
+
+	case TT_CONC:
+		leftStr, okLeft := leftVal.(string)
+		rightStr, okRight := rightVal.(string)
+		if okLeft && okRight {
+			return leftStr + rightStr, nil
+		}
+		return nil, fmt.Errorf("Cannot concatenate non-string types")
 	default:
 		return nil, fmt.Errorf("Unknown operator: %s", node.Op_Tok.Value)
 	}
+
+	return nil, fmt.Errorf("Unknown error")
 }
 
 func (i Interpreter) visitUnaryOpNode(node UnaryOpNode) (interface{}, error) {
@@ -606,16 +672,15 @@ func (i Interpreter) visitUnaryOpNode(node UnaryOpNode) (interface{}, error) {
 }
 
 func (i Interpreter) visitStringNode(node StringNode) (interface{}, error) {
-    return node.Tok.Value, nil
+	return node.Tok.Value, nil
 }
 
 func (i Interpreter) visitBoolNode(node BoolNode) (interface{}, error) {
-    if node.Tok.Value == "true" {
-        return true, nil
-    }
-    return false, nil
+	if node.Tok.Value == "true" {
+		return true, nil
+	}
+	return false, nil
 }
-
 
 // RUN //
 
