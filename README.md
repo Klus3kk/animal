@@ -16,17 +16,27 @@ You can test the language by writing:
 
 ## Technologies
 
-* Go language.
-* Lexers, tokens.
+* Go language,
+* Lexer,
+* Parser,
+* Tokens.
 
 ## Instruction
 
 Operators:
 
-* "*" - moo
-* "+" - meow
-* "-" - woof
-* "/" - drone
-* "%" - squeak
+* "*" - moo,
+* "+" - meow,
+* "-" - woof,
+* "/" - drone,
+* "%" - squeak,
+* "^" - soar.
 
+Brackets:
+
+* () - round,
+* [] - square,
+* {} - curly.
+
+<br>
 **Status: In progress.**
