@@ -177,6 +177,10 @@ func (l *Lexer) make_tokens() ([]Token, error) {
 			l.advance()
 		} else if strings.IndexByte(DIGITS, l.CurrentChar) != -1 {
 			tokens = append(tokens, l.make_number()) // Tokenize number
+		} else if l.CurrentChar == '"' {
+			tokens = append(tokens, l.make_string()) // Tokenize string
+		} else if l.peek(4) == "true" || l.peek(5) == "false" {
+			tokens = append(tokens, l.make_boolean()) // Tokenize boolean
 		} else if l.peek(4) == "meow" {
 			posStart := l.Pos.copy() // Copy the current position as the token's start
 			l.advanceBy(4)
@@ -278,8 +282,53 @@ func (l *Lexer) make_number() Token {
 	}
 }
 
+// Make a string token
+func (l *Lexer) make_string() Token {
+	posStart := l.Pos.copy()
+	l.advance() // Skip opening quote
+	strVal := ""
+
+	for l.CurrentChar != 0 && l.CurrentChar != '"' {
+		strVal += string(l.CurrentChar)
+		l.advance()
+	}
+
+	l.advance() // Skip closing quote
+	return Token{Type: TT_STRING, Value: strVal, Pos_Start: posStart, Pos_End: l.Pos.copy()}
+}
+
+// Make a boolean token
+func (l *Lexer) make_boolean() Token {
+	posStart := l.Pos.copy()
+	if l.peek(4) == "true" {
+		l.advanceBy(4)
+		return Token{Type: TT_BOOL, Value: "true", Pos_Start: posStart, Pos_End: l.Pos.copy()}
+	} else if l.peek(5) == "false" {
+		l.advanceBy(5)
+		return Token{Type: TT_BOOL, Value: "false", Pos_Start: posStart, Pos_End: l.Pos.copy()}
+	}
+	return Token{}
+}
+
 // NODES //
 // __init__ (self, Tok)
+// New Node for String
+type StringNode struct {
+	Tok Token
+}
+
+func (n StringNode) String() string {
+	return fmt.Sprintf("(%s: %s)", n.Tok.Type, n.Tok.Value)
+}
+
+// New Node for Boolean
+type BoolNode struct {
+	Tok Token
+}
+
+func (n BoolNode) String() string {
+	return fmt.Sprintf("(%s: %s)", n.Tok.Type, n.Tok.Value)
+}
 
 type NumberNode struct {
 	Tok Token
@@ -374,35 +423,41 @@ func (p *Parser) parse() *ParseResult {
 ////////////
 
 func (p *Parser) factor() *ParseResult {
-	res := &ParseResult{}
-	tok := p.Current_Tok
+    res := &ParseResult{}
+    tok := p.Current_Tok
 
-	if tok.Type == TT_POS || tok.Type == TT_NEG {
-		// Advance the token, but don't register it as a *ParseResult
-		p.advance()
-		factor := res.register(p.factor())
-		if res.Error != "" {
-			return res
-		}
-		return res.success(UnaryOpNode{Op_Tok: tok, Node: factor})
-	} else if tok.Type == TT_INT || tok.Type == TT_FLOAT {
-		p.advance() // No need to register, just advance
-		return res.success(NumberNode{Tok: tok})
-	} else if tok.Type == TT_LROUNDBR {
-		p.advance() // same here
-		expr := p.expr()
-		if expr.Error != "" {
-			return res.failure(expr.Error)
-		}
-		if p.Current_Tok.Type == TT_RROUNDBR {
-			p.advance() // -||-
-			return res.success(expr.Node)
-		} else {
-			return res.failure("Expected ')'")
-		}
-	}
-	return res.failure("Expected int, float, '+', '-', or '('")
+    if tok.Type == TT_POS || tok.Type == TT_NEG {
+        p.advance()
+        factor := res.register(p.factor())
+        if res.Error != "" {
+            return res
+        }
+        return res.success(UnaryOpNode{Op_Tok: tok, Node: factor})
+    } else if tok.Type == TT_INT || tok.Type == TT_FLOAT {
+        p.advance()
+        return res.success(NumberNode{Tok: tok})
+    } else if tok.Type == TT_BOOL {
+        p.advance()
+        return res.success(BoolNode{Tok: tok})
+    } else if tok.Type == TT_STRING {
+        p.advance()
+        return res.success(StringNode{Tok: tok})
+    } else if tok.Type == TT_LROUNDBR {
+        p.advance()
+        expr := p.expr()
+        if expr.Error != "" {
+            return res.failure(expr.Error)
+        }
+        if p.Current_Tok.Type == TT_RROUNDBR {
+            p.advance()
+            return res.success(expr.Node)
+        } else {
+            return res.failure("Expected ')'")
+        }
+    }
+    return res.failure("Expected int, float, boolean, string, '+', '-', or '('")
 }
+
 
 func (p *Parser) term() *ParseResult {
 	return p.bin_op(p.factor, []TokenType{TT_MUL, TT_DIV})
@@ -456,22 +511,140 @@ func contains(ops []TokenType, op TokenType) bool {
 	return false
 }
 
+// RUNTIME RESULT
+
+// INTERPRETER //
+type Interpreter struct{}
+
+func (i Interpreter) visit(node interface{}) (interface{}, error) {
+	/*  dynamically dispatch based on node type (<3 switch, thanks you for existing)
+	    in Python you could probably make it a bit easier with strings, but i don't care, this works
+		kinda
+	*/
+	switch node := node.(type) {
+    case NumberNode:
+        return i.visitNumberNode(node)
+    case BinOpNode:
+        return i.visitBinOpNode(node)
+    case UnaryOpNode:
+        return i.visitUnaryOpNode(node)
+    case StringNode:
+        return i.visitStringNode(node)
+    case BoolNode:
+        return i.visitBoolNode(node)
+    default:
+        return nil, fmt.Errorf("No visit method for node type %T", node)
+    }
+}
+
+// Visit methods
+
+func (i Interpreter) visitNumberNode(node NumberNode) (interface{}, error) {
+	// Always return float64 to avoid type mismatch
+	if node.Tok.Type == TT_INT {
+		val, err := strconv.Atoi(node.Tok.Value)
+		if err != nil {
+			return nil, err
+		}
+		return float64(val), nil
+	} else if node.Tok.Type == TT_FLOAT {
+		val, err := strconv.ParseFloat(node.Tok.Value, 64)
+		if err != nil {
+			return nil, err
+		}
+		return val, nil
+	}
+	return nil, fmt.Errorf("Invalid number type: %s", node.Tok.Type)
+}
+
+func (i Interpreter) visitBinOpNode(node BinOpNode) (interface{}, error) {
+	// Evaluate the left and right nodes, assume both are float64
+	leftVal, err := i.visit(node.Left_Node)
+	if err != nil {
+		return nil, err
+	}
+
+	rightVal, err := i.visit(node.Right_Node)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert to float64 before operations to handle both int and float
+	leftFloat := leftVal.(float64)
+	rightFloat := rightVal.(float64)
+
+	// Apply the operator based on node.Op_Tok
+	switch node.Op_Tok.Type {
+	case TT_PLUS:
+		return leftFloat + rightFloat, nil
+	case TT_MINUS:
+		return leftFloat - rightFloat, nil
+	case TT_MUL:
+		return leftFloat * rightFloat, nil
+	case TT_DIV:
+		if rightFloat == 0 {
+			return nil, fmt.Errorf("Division by zero")
+		}
+		return leftFloat / rightFloat, nil
+	default:
+		return nil, fmt.Errorf("Unknown operator: %s", node.Op_Tok.Value)
+	}
+}
+
+func (i Interpreter) visitUnaryOpNode(node UnaryOpNode) (interface{}, error) {
+	// Evaluate the operand
+	val, err := i.visit(node.Node)
+	if err != nil {
+		return nil, err
+	}
+
+	// Apply the unary operator
+	switch node.Op_Tok.Type {
+	case TT_POS:
+		return +val.(float64), nil
+	case TT_NEG:
+		return -val.(float64), nil
+	default:
+		return nil, fmt.Errorf("Unknown unary operator: %s", node.Op_Tok.Type)
+	}
+}
+
+func (i Interpreter) visitStringNode(node StringNode) (interface{}, error) {
+    return node.Tok.Value, nil
+}
+
+func (i Interpreter) visitBoolNode(node BoolNode) (interface{}, error) {
+    if node.Tok.Value == "true" {
+        return true, nil
+    }
+    return false, nil
+}
+
+
 // RUN //
 
 func run(text string, fn string) (interface{}, error) {
 	// Generate Tokens
 	lexer := NewLexer(fn, text)
 	tokens, err := lexer.make_tokens()
-	if err != nil { // if error: return None, error
+	if err != nil {
 		return nil, err
 	}
 
 	// Generate AST
 	parser := NewParser(tokens)
-	res := parser.expr()
+	res := parser.parse()
 
 	if res.Error != "" {
 		return nil, fmt.Errorf(res.Error)
 	}
-	return res.Node, nil
+
+	// Interpret the AST
+	interpreter := Interpreter{}
+	result, err := interpreter.visit(res.Node)
+	if err != nil {
+		return nil, err
+	}
+
+	return result, nil
 }
