@@ -113,7 +113,7 @@ const (
 	TT_LSQRBR   TokenType = "LSQRBR"
 	TT_RCURLBR  TokenType = "RCURLBR"
 	TT_LCURLBR  TokenType = "LCURLBR"
-	TT_EOF      TokenType = "EOF" // End of file
+	TT_EOF      TokenType = "EOF" 
 )
 
 // Token represents a token with its type and value
@@ -312,7 +312,6 @@ func (l *Lexer) make_boolean() Token {
 
 // NODES //
 // __init__ (self, Tok)
-// New Node for String
 type StringNode struct {
 	Tok Token
 }
@@ -321,7 +320,6 @@ func (n StringNode) String() string {
 	return fmt.Sprintf("(%s: %s)", n.Tok.Type, n.Tok.Value)
 }
 
-// New Node for Boolean
 type BoolNode struct {
 	Tok Token
 }
@@ -511,8 +509,6 @@ func contains(ops []TokenType, op TokenType) bool {
 	return false
 }
 
-// RUNTIME RESULT
-
 // INTERPRETER //
 type Interpreter struct{}
 
@@ -583,7 +579,7 @@ func (i Interpreter) visitBinOpNode(node BinOpNode) (interface{}, error) {
 		return leftFloat * rightFloat, nil
 	case TT_DIV:
 		if rightFloat == 0 {
-			return nil, fmt.Errorf("Division by zero")
+			return nil, fmt.Errorf("ERROR: Division by zero")
 		}
 		return leftFloat / rightFloat, nil
 	default:
