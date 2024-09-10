@@ -10,6 +10,8 @@ import (
 // CONSTANTS //
 
 const DIGITS string = "0123456789"
+const LETTERS string = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+const LETTERS_DIGITS string = LETTERS + DIGITS
 
 // ERRORS //
 
@@ -96,19 +98,22 @@ func (p *Position) copy() *Position {
 type TokenType string
 
 const (
-	TT_INT      TokenType = "INT"      //
-	TT_FLOAT    TokenType = "FLOAT"    //
-	TT_BOOL     TokenType = "BOOL"     //
-	TT_STRING   TokenType = "STRING"   //
-	TT_PLUS     TokenType = "PLUS"     //
-	TT_MINUS    TokenType = "MINUS"    //
-	TT_NEG      TokenType = "NEG"      //
-	TT_POS      TokenType = "POS"      //
-	TT_MUL      TokenType = "MUL"      //
-	TT_DIV      TokenType = "DIV"      //
-	TT_MOD      TokenType = "MOD"      //
-	TT_EXP      TokenType = "EXP"      //
-	TT_CONC     TokenType = "CONC"     //
+	TT_INT      TokenType = "INT"    //
+	TT_FLOAT    TokenType = "FLOAT"  //
+	TT_BOOL     TokenType = "BOOL"   //
+	TT_STRING   TokenType = "STRING" //
+	TT_IDEN     TokenType = "IDEN"
+	TT_KEY      TokenType = "KEY"
+	TT_PLUS     TokenType = "PLUS"  //
+	TT_MINUS    TokenType = "MINUS" //
+	TT_NEG      TokenType = "NEG"   //
+	TT_POS      TokenType = "POS"   //
+	TT_MUL      TokenType = "MUL"   //
+	TT_DIV      TokenType = "DIV"   //
+	TT_MOD      TokenType = "MOD"   //
+	TT_EXP      TokenType = "EXP"   //
+	TT_CONC     TokenType = "CONC"  //
+	TT_EQ       TokenType = "EQ"
 	TT_LROUNDBR TokenType = "LROUNDBR" //
 	TT_RROUNDBR TokenType = "RROUNDBR" //
 	TT_RSQRBR   TokenType = "RSQRBR"   //
@@ -117,6 +122,10 @@ const (
 	TT_LCURLBR  TokenType = "LCURLBR"  //
 	TT_EOF      TokenType = "EOF"      //
 )
+
+var KEYWORDS = []string{
+	"INT", "FLOAT", "BOOL", "STRING",
+}
 
 // Token represents a token with its type and value
 type Token struct {
@@ -132,6 +141,10 @@ func (t Token) String() string {
 		return fmt.Sprintf("(%s): [%s]", t.Type, t.Value)
 	}
 	return fmt.Sprintf("(%s)", t.Type)
+}
+
+func (t Token) matches(type_ TokenType, value string) bool {
+	return string(t.Type) == string(type_) && t.Value == value
 }
 
 // LEXER //
@@ -179,6 +192,8 @@ func (l *Lexer) make_tokens() ([]Token, error) {
 			l.advance()
 		} else if strings.IndexByte(DIGITS, l.CurrentChar) != -1 {
 			tokens = append(tokens, l.make_number()) // Tokenize number
+		} else if strings.IndexByte(LETTERS, l.CurrentChar) != -1 {
+			tokens = append(tokens, l.make_identifier()) // Tokenize letter
 		} else if l.CurrentChar == '"' {
 			tokens = append(tokens, l.make_string()) // Tokenize string
 		} else if l.peek(4) == "true" || l.peek(5) == "false" {
@@ -218,6 +233,11 @@ func (l *Lexer) make_tokens() ([]Token, error) {
 			l.advanceBy(4)
 			posEnd := l.Pos.copy()
 			tokens = append(tokens, Token{Type: TT_CONC, Value: "CONC", Pos_Start: posStart, Pos_End: posEnd})
+		} else if l.peek(2) == "->" {
+			posStart := l.Pos.copy()
+			l.advanceBy(2)
+			posEnd := l.Pos.copy()
+			tokens = append(tokens, Token{Type: TT_EQ, Value: "EQ", Pos_Start: posStart, Pos_End: posEnd})
 		} else if l.CurrentChar == '(' {
 			posStart := l.Pos.copy()
 			l.advance()
@@ -271,6 +291,26 @@ func (l *Lexer) advanceBy(count int) {
 	for i := 0; i < count; i++ {
 		l.advance()
 	}
+}
+
+func (l *Lexer) make_identifier() Token {
+	idStr := ""
+	Pos_Start := l.Pos.copy()
+	tok_Type := TT_IDEN
+
+	for l.CurrentChar != 0 && strings.ContainsAny(string(l.CurrentChar), LETTERS_DIGITS+"_") {
+		idStr += string(l.CurrentChar)
+		l.advance()
+	}
+
+	for _, keyword := range KEYWORDS {
+		if idStr == keyword {
+			tok_Type = TT_KEY
+			break
+		}
+	}
+
+	return Token{Type: tok_Type, Value: idStr, Pos_Start: Pos_Start, Pos_End: l.Pos}
 }
 
 func (l *Lexer) make_number() Token {
@@ -378,6 +418,15 @@ func (u UnaryOpNode) String() string { // __repr__
 	return fmt.Sprintf("(%s %s)", u.Op_Tok.Type, u.Node)
 }
 
+type VarAccessNode struct {
+	Var_Name_Tok Token
+}
+
+type VarAssignNode struct {
+	Var_Name_Tok Token
+	Value_Node   interface{}
+}
+
 // PARSE RESULT //
 
 type ParseResult struct {
@@ -462,6 +511,9 @@ func (p *Parser) atom() *ParseResult {
 	} else if tok.Type == TT_STRING {
 		p.advance()
 		return res.success(StringNode{Tok: tok})
+	} else if tok.Type == TT_IDEN {
+		p.advance()
+		return res.success(VarAccessNode{Var_Name_Tok: tok})
 	} else if tok.Type == TT_LROUNDBR {
 		p.advance()
 		expr := p.expr()
@@ -527,6 +579,35 @@ func (p *Parser) term() *ParseResult {
 
 // Addition and subtraction, lowest precedence
 func (p *Parser) expr() *ParseResult {
+	res := &ParseResult{}
+
+	if p.Current_Tok.matches(TT_KEY, "INT") {
+		p.advance() // res.register(p.advance())
+
+		if p.Current_Tok.Type != TT_IDEN {
+			return res.failure(NewInvalidSyntaxError(
+				p.Current_Tok.Pos_Start, p.Current_Tok.Pos_End,
+				"Expected identifier",
+			).asString())
+		}
+		var_name := p.Current_Tok
+		p.advance()
+
+		if p.Current_Tok.Type != TT_EQ {
+			return res.failure(NewInvalidSyntaxError(
+				p.Current_Tok.Pos_Start, p.Current_Tok.Pos_End,
+				"Expected '->'",
+			).asString())
+		}
+		p.advance()
+		expr := res.register(p.expr())
+		if res.Error != "" {
+			return res
+		}
+
+		return res.success(VarAssignNode{Var_Name_Tok: var_name, Value_Node: expr})
+	}
+
 	return p.bin_op(p.term, []TokenType{TT_PLUS, TT_MINUS})
 }
 
@@ -559,6 +640,11 @@ func contains(ops []TokenType, op TokenType) bool {
 		}
 	}
 	return false
+}
+
+// SYMBOL TABLE
+type SymbolTable struct {
+	
 }
 
 // INTERPRETER //
