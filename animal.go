@@ -441,20 +441,19 @@ func (p *Parser) parse() *ParseResult {
 	return res
 }
 
-////////////
+// HIERARCHY //
 
-func (p *Parser) factor() *ParseResult {
+// Exponentiation, highest precedence
+func (p *Parser) power() *ParseResult {
+	return p.bin_op(p.atom, []TokenType{TT_EXP})
+}
+
+// Handles parentheses and atoms (integers, booleans, strings)
+func (p *Parser) atom() *ParseResult {
 	res := &ParseResult{}
 	tok := p.Current_Tok
 
-	if tok.Type == TT_POS || tok.Type == TT_NEG {
-		p.advance()
-		factor := res.register(p.factor())
-		if res.Error != "" {
-			return res
-		}
-		return res.success(UnaryOpNode{Op_Tok: tok, Node: factor})
-	} else if tok.Type == TT_INT || tok.Type == TT_FLOAT {
+	if tok.Type == TT_INT || tok.Type == TT_FLOAT {
 		p.advance()
 		return res.success(NumberNode{Tok: tok})
 	} else if tok.Type == TT_BOOL {
@@ -503,28 +502,35 @@ func (p *Parser) factor() *ParseResult {
 	return res.failure("Expected int, float, boolean, string, '+', '-', '(', '[', '{'")
 }
 
-func (p *Parser) term() *ParseResult {
-	return p.bin_op(p.factor, []TokenType{TT_MUL, TT_DIV, TT_MOD, TT_EXP, TT_CONC})
-}
+// Unary operations: + and -
+func (p *Parser) factor() *ParseResult {
+	res := &ParseResult{}
+	tok := p.Current_Tok
 
-func (p *Parser) expr() *ParseResult {
-	res := p.bin_op(p.term, []TokenType{TT_PLUS, TT_MINUS})
-
-	// Check if there are multiple consecutive numbers without operators
-	if res.Error == "" && p.Current_Tok.Type != TT_EOF {
-		// If we have not reached EOF, check for invalid syntax
-		if p.Current_Tok.Type == TT_INT || p.Current_Tok.Type == TT_FLOAT {
-			return res.failure(NewInvalidSyntaxError(
-				p.Current_Tok.Pos_Start, p.Current_Tok.Pos_End,
-				"Unexpected consecutive numbers, expected operator",
-			).asString())
+	if tok.Type == TT_POS || tok.Type == TT_NEG {
+		p.advance()
+		factor := res.register(p.factor())
+		if res.Error != "" {
+			return res
 		}
+		return res.success(UnaryOpNode{Op_Tok: tok, Node: factor})
 	}
-	return res
+
+	// Proceed to the next higher precedence operation
+	return p.power()
 }
 
-////////////
+// Multiplication, division, modulo, and concatenation
+func (p *Parser) term() *ParseResult {
+	return p.bin_op(p.factor, []TokenType{TT_MUL, TT_DIV, TT_MOD, TT_CONC})
+}
 
+// Addition and subtraction, lowest precedence
+func (p *Parser) expr() *ParseResult {
+	return p.bin_op(p.term, []TokenType{TT_PLUS, TT_MINUS})
+}
+
+// The bin_op function ensures the correct precedence for binary operations
 func (p *Parser) bin_op(funcToCall func() *ParseResult, ops []TokenType) *ParseResult {
 	res := &ParseResult{}
 	left := res.register(funcToCall())
@@ -582,7 +588,7 @@ func (i Interpreter) visit(node interface{}) (interface{}, error) {
 // Visit methods
 
 func (i Interpreter) visitNumberNode(node NumberNode) (interface{}, error) {
-	// Always return float64 to avoid type mismatch
+	// it is recommended to return float64 to avoid type mismatch
 	if node.Tok.Type == TT_INT {
 		val, err := strconv.Atoi(node.Tok.Value)
 		if err != nil {
