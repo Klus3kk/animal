@@ -644,7 +644,27 @@ func contains(ops []TokenType, op TokenType) bool {
 
 // SYMBOL TABLE
 type SymbolTable struct {
-	
+	symbols map[string]interface{} // Dictionary to store symbols
+	parent  *SymbolTable           // Pointer to parent symbol table
+}
+
+// Get a value from the symbol table
+func (s *SymbolTable) get(name string) interface{} {
+	value, exists := s.symbols[name]
+	if !exists && s.parent != nil {
+		return s.parent.get(name)
+	}
+	return value
+}
+
+// Set a value in the symbol table
+func (s *SymbolTable) set(name string, value interface{}) {
+	s.symbols[name] = value
+}
+
+// Remove a symbol from the table
+func (s *SymbolTable) remove(name string) {
+	delete(s.symbols, name)
 }
 
 // INTERPRETER //
