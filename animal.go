@@ -15,33 +15,30 @@ const LETTERS_DIGITS string = LETTERS + DIGITS
 
 // TOKENS //
 
-// TokenType defines the type of token
-type TokenType string
-
 const (
-	TT_INT      TokenType = "INT"    //
-	TT_FLOAT    TokenType = "FLOAT"  //
-	TT_BOOL     TokenType = "BOOL"   //
-	TT_STRING   TokenType = "STRING" //
-	TT_IDEN     TokenType = "IDENTIFIER"
-	TT_KEY      TokenType = "KEYWORD"
-	TT_PLUS     TokenType = "PLUS"  //
-	TT_MINUS    TokenType = "MINUS" //
-	TT_NEG      TokenType = "NEG"   //
-	TT_POS      TokenType = "POS"   //
-	TT_MUL      TokenType = "MUL"   //
-	TT_DIV      TokenType = "DIV"   //
-	TT_MOD      TokenType = "MOD"   //
-	TT_EXP      TokenType = "EXP"   //
-	TT_CONC     TokenType = "CONC"  //
-	TT_EQ       TokenType = "EQ"
-	TT_LROUNDBR TokenType = "LROUNDBR" //
-	TT_RROUNDBR TokenType = "RROUNDBR" //
-	TT_RSQRBR   TokenType = "RSQRBR"   //
-	TT_LSQRBR   TokenType = "LSQRBR"   //
-	TT_RCURLBR  TokenType = "RCURLBR"  //
-	TT_LCURLBR  TokenType = "LCURLBR"  //
-	TT_EOF      TokenType = "EOF"      //
+	TT_INT      = "INT"    //
+	TT_FLOAT    = "FLOAT"  //
+	TT_BOOL     = "BOOL"   //
+	TT_STRING   = "STRING" //
+	TT_IDEN     = "IDENTIFIER"
+	TT_KEY      = "KEYWORD"
+	TT_PLUS     = "PLUS"  //
+	TT_MINUS    = "MINUS" //
+	TT_NEG      = "NEG"   //
+	TT_POS      = "POS"   //
+	TT_MUL      = "MUL"   //
+	TT_DIV      = "DIV"   //
+	TT_MOD      = "MOD"   //
+	TT_EXP      = "EXP"   //
+	TT_CONC     = "CONC"  //
+	TT_EQ       = "EQ"
+	TT_LROUNDBR = "LROUNDBR" //
+	TT_RROUNDBR = "RROUNDBR" //
+	TT_RSQRBR   = "RSQRBR"   //
+	TT_LSQRBR   = "LSQRBR"   //
+	TT_RCURLBR  = "RCURLBR"  //
+	TT_LCURLBR  = "LCURLBR"  //
+	TT_EOF      = "EOF"      //
 )
 
 var KEYWORDS = []string{
@@ -50,7 +47,7 @@ var KEYWORDS = []string{
 
 // Token represents a token with its type and value
 type Token struct {
-	Type      TokenType
+	Type      string
 	Value     string
 	Pos_Start *Position
 	Pos_End   *Position
@@ -64,7 +61,7 @@ func (t Token) String() string {
 	return fmt.Sprintf("(%s)", t.Type)
 }
 
-func (t Token) matches(type_ TokenType, value string) bool {
+func (t Token) matches(type_ string, value string) bool {
 	return string(t.Type) == string(type_) && t.Value == value
 }
 
@@ -506,7 +503,7 @@ func (p *Parser) parse() *ParseResult {
 
 // Exponentiation, highest precedence
 func (p *Parser) power() *ParseResult {
-	return p.bin_op(p.atom, []TokenType{TT_EXP})
+	return p.bin_op(p.atom, []string{TT_EXP})
 }
 
 // Handles parentheses and atoms (integers, booleans, strings)
@@ -586,50 +583,50 @@ func (p *Parser) factor() *ParseResult {
 
 // Multiplication, division, modulo, and concatenation
 func (p *Parser) term() *ParseResult {
-	return p.bin_op(p.factor, []TokenType{TT_MUL, TT_DIV, TT_MOD, TT_CONC})
+	return p.bin_op(p.factor, []string{TT_MUL, TT_DIV, TT_MOD, TT_CONC})
 }
 
 // Modified expr function to handle variable assignments with types and operations
 func (p *Parser) expr() *ParseResult {
-    res := &ParseResult{}
+	res := &ParseResult{}
 
-    // Handle variable access
-    if p.Current_Tok.Type == TT_IDEN {
-        var_name := p.Current_Tok
-        p.advance()
+	// Handle variable access
+	if p.Current_Tok.Type == TT_IDEN {
+		var_name := p.Current_Tok
+		p.advance()
 
-        // Check for assignment (e.g., int -> 10)
-        if p.Current_Tok.Type == TT_KEY && p.Current_Tok.matches(TT_KEY, "int") {
-            p.advance()
+		// Check for assignment (e.g., int -> 10)
+		if p.Current_Tok.Type == TT_KEY && p.Current_Tok.matches(TT_KEY, "int") {
+			p.advance()
 
-            if p.Current_Tok.Type != TT_EQ {
-                return res.failure(NewInvalidSyntaxError(
-                    p.Current_Tok.Pos_Start, p.Current_Tok.Pos_End,
-                    "Expected '->' after type",
-                ).asString())
-            }
-            p.advance()
+			if p.Current_Tok.Type != TT_EQ {
+				return res.failure(NewInvalidSyntaxError(
+					p.Current_Tok.Pos_Start, p.Current_Tok.Pos_End,
+					"Expected '->' after type",
+				).asString())
+			}
+			p.advance()
 
-            value_expr := res.register(p.expr())
-            if res.Error != "" {
-                return res
-            }
+			value_expr := res.register(p.expr())
+			if res.Error != "" {
+				return res
+			}
 
-            fmt.Printf("Assignment to variable %s\n", var_name.Value) // Added debug
-            return res.success(VarAssignNode{Var_Name_Tok: var_name, Value_Node: value_expr})
-        }
+			fmt.Printf("Assignment to variable %s\n", var_name.Value) // Added debug
+			return res.success(VarAssignNode{Var_Name_Tok: var_name, Value_Node: value_expr})
+		}
 
-        // If it is not an assignment, treat it as a variable access
-        fmt.Printf("Variable access for %s\n", var_name.Value) // Added debug
-        return res.success(VarAccessNode{Var_Name_Tok: var_name})
-    }
+		// If it is not an assignment, treat it as a variable access
+		fmt.Printf("Variable access for %s\n", var_name.Value) // Added debug
+		return res.success(VarAccessNode{Var_Name_Tok: var_name})
+	}
 
-    // Handle binary operations and other expressions
-    return p.bin_op(p.term, []TokenType{TT_PLUS, TT_MINUS})
+	// Handle binary operations and other expressions
+	return p.bin_op(p.term, []string{TT_PLUS, TT_MINUS})
 }
 
 // The bin_op function ensures the correct precedence for binary operations
-func (p *Parser) bin_op(funcToCall func() *ParseResult, ops []TokenType) *ParseResult {
+func (p *Parser) bin_op(funcToCall func() *ParseResult, ops []string) *ParseResult {
 	res := &ParseResult{}
 	left := res.register(funcToCall())
 	if res.Error != "" {
@@ -650,7 +647,7 @@ func (p *Parser) bin_op(funcToCall func() *ParseResult, ops []TokenType) *ParseR
 }
 
 // Utility function to check if a TokenType is in the list
-func contains(ops []TokenType, op TokenType) bool {
+func contains(ops []string, op string) bool {
 	for _, val := range ops {
 		if val == op {
 			return true
