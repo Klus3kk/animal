@@ -693,6 +693,15 @@ func NewSymbolTable() *SymbolTable {
 }
 
 // Get a value from the symbol table
+func (s *SymbolTable) set(name string, value interface{}) {
+	if name == "" {
+		fmt.Println("Error: Variable name cannot be empty")
+		return
+	}
+	fmt.Printf("Setting variable %s to %v in context\n", name, value)
+	s.symbols[name] = value
+}
+
 func (s *SymbolTable) get(name string) interface{} {
 	if name == "" {
 		fmt.Println("Error: Variable name cannot be empty")
@@ -700,20 +709,12 @@ func (s *SymbolTable) get(name string) interface{} {
 	}
 	value, exists := s.symbols[name]
 	if exists {
+		fmt.Printf("Getting variable %s with value %v from context\n", name, value)
 		return value
 	} else if s.parent != nil {
 		return s.parent.get(name)
 	}
-	return nil // Or handle variable not found error
-}
-
-// Set a value in the symbol table
-func (s *SymbolTable) set(name string, value interface{}) {
-	if name == "" {
-		fmt.Println("Error: Variable name cannot be empty")
-		return
-	}
-	s.symbols[name] = value
+	return nil
 }
 
 // Remove a symbol from the table
@@ -752,33 +753,22 @@ func (i Interpreter) visit(node interface{}, context *Context) (interface{}, err
 // Visit methods
 func (i Interpreter) visitVarAccessNode(node VarAccessNode, context *Context) (interface{}, error) {
 	var_name := node.Var_Name_Tok.Value
-
-	// Print variable name being accessed
-	fmt.Printf("Accessing variable: %s\n", var_name)
-
-	// Retrieve variable from symbol table
 	value := context.Symbol_Table.get(var_name)
 	if value == nil {
 		return nil, fmt.Errorf("%s is not defined", var_name)
 	}
+	fmt.Printf("Accessing variable %s with value %v\n", var_name, value)
 	return value, nil
 }
 
 func (i Interpreter) visitVarAssignNode(node VarAssignNode, context *Context) (interface{}, error) {
 	var_name := node.Var_Name_Tok.Value
-
-	// Print variable name and value being assigned
-	fmt.Printf("Assigning variable: %s\n", var_name)
-
 	value, err := i.visit(node.Value_Node, context)
 	if err != nil {
 		return nil, err
 	}
 
-	// Print the value being set
-	fmt.Printf("Value assigned: %v\n", value)
-
-	// Set the variable in the symbol table
+	fmt.Printf("Assigning variable %s with value %v\n", var_name, value)
 	context.Symbol_Table.set(var_name, value)
 	return value, nil
 }
