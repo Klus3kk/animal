@@ -591,39 +591,41 @@ func (p *Parser) term() *ParseResult {
 
 // Modified expr function to handle variable assignments with types and operations
 func (p *Parser) expr() *ParseResult {
-	res := &ParseResult{}
+    res := &ParseResult{}
 
-	// Handle variable access
-	if p.Current_Tok.Type == TT_IDEN {
-		var_name := p.Current_Tok
-		p.advance()
+    // Handle variable access
+    if p.Current_Tok.Type == TT_IDEN {
+        var_name := p.Current_Tok
+        p.advance()
 
-		// Check for assignment (e.g., int -> 10)
-		if p.Current_Tok.Type == TT_KEY && p.Current_Tok.matches(TT_KEY, "int") {
-			p.advance()
+        // Check for assignment (e.g., int -> 10)
+        if p.Current_Tok.Type == TT_KEY && p.Current_Tok.matches(TT_KEY, "int") {
+            p.advance()
 
-			if p.Current_Tok.Type != TT_EQ {
-				return res.failure(NewInvalidSyntaxError(
-					p.Current_Tok.Pos_Start, p.Current_Tok.Pos_End,
-					"Expected '->' after type",
-				).asString())
-			}
-			p.advance()
+            if p.Current_Tok.Type != TT_EQ {
+                return res.failure(NewInvalidSyntaxError(
+                    p.Current_Tok.Pos_Start, p.Current_Tok.Pos_End,
+                    "Expected '->' after type",
+                ).asString())
+            }
+            p.advance()
 
-			value_expr := res.register(p.expr())
-			if res.Error != "" {
-				return res
-			}
+            value_expr := res.register(p.expr())
+            if res.Error != "" {
+                return res
+            }
 
-			return res.success(VarAssignNode{Var_Name_Tok: var_name, Value_Node: value_expr})
-		}
+            fmt.Printf("Assignment to variable %s\n", var_name.Value) // Added debug
+            return res.success(VarAssignNode{Var_Name_Tok: var_name, Value_Node: value_expr})
+        }
 
-		// If it is not an assignment, treat it as a variable access
-		return res.success(VarAccessNode{Var_Name_Tok: var_name})
-	}
+        // If it is not an assignment, treat it as a variable access
+        fmt.Printf("Variable access for %s\n", var_name.Value) // Added debug
+        return res.success(VarAccessNode{Var_Name_Tok: var_name})
+    }
 
-	// Handle binary operations and other expressions
-	return p.bin_op(p.term, []TokenType{TT_PLUS, TT_MINUS})
+    // Handle binary operations and other expressions
+    return p.bin_op(p.term, []TokenType{TT_PLUS, TT_MINUS})
 }
 
 // The bin_op function ensures the correct precedence for binary operations
@@ -712,8 +714,10 @@ func (s *SymbolTable) get(name string) interface{} {
 		fmt.Printf("Getting variable %s with value %v from context\n", name, value)
 		return value
 	} else if s.parent != nil {
+		fmt.Printf("Looking up variable %s in parent context\n", name) // Added debug
 		return s.parent.get(name)
 	}
+	fmt.Printf("Variable %s not found\n", name) // Added debug
 	return nil
 }
 
@@ -755,6 +759,7 @@ func (i Interpreter) visitVarAccessNode(node VarAccessNode, context *Context) (i
 	var_name := node.Var_Name_Tok.Value
 	value := context.Symbol_Table.get(var_name)
 	if value == nil {
+		fmt.Printf("Variable %s not found in context\n", var_name) // Added debug
 		return nil, fmt.Errorf("%s is not defined", var_name)
 	}
 	fmt.Printf("Accessing variable %s with value %v\n", var_name, value)
