@@ -13,85 +13,6 @@ const DIGITS string = "0123456789"
 const LETTERS string = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 const LETTERS_DIGITS string = LETTERS + DIGITS
 
-// ERRORS //
-
-type Error struct {
-	ErrorName string
-	Details   string
-	PosStart  *Position
-	PosEnd    *Position
-}
-
-func (e Error) asString() string {
-	result := fmt.Sprintf("%s: %s", e.ErrorName, e.Details)
-	result += fmt.Sprintf(" File %s, line %d", e.PosStart.Fn, e.PosStart.Ln+1)
-	return result
-}
-
-// IllegalCharError struct inheriting from Error
-type IllegalCharError struct {
-	Error
-}
-
-func NewIllegalCharError(posStart, posEnd *Position, details string) *IllegalCharError {
-	return &IllegalCharError{
-		Error: Error{
-			PosStart:  posStart,
-			PosEnd:    posEnd,
-			ErrorName: "Illegal Character",
-			Details:   details,
-		},
-	}
-}
-
-// InvalidSyntaxError struct inheriting from Error
-type InvalidSyntaxError struct {
-	Error
-}
-
-func NewInvalidSyntaxError(posStart, posEnd *Position, details string) *InvalidSyntaxError {
-	return &InvalidSyntaxError{
-		Error: Error{
-			PosStart:  posStart,
-			PosEnd:    posEnd,
-			ErrorName: "Invalid Syntax",
-			Details:   details,
-		},
-	}
-}
-
-// POSITION //
-
-type Position struct {
-	Idx  int
-	Ln   int
-	Col  int
-	Fn   string
-	Ftxt string
-}
-
-func NewPosition(idx, ln, col int, fn, ftxt string) *Position {
-	return &Position{Idx: idx, Ln: ln, Col: col, Fn: fn, Ftxt: ftxt}
-}
-
-func (p *Position) asString() string {
-	return fmt.Sprintf("File %s, line %d", p.Fn, p.Ln+1)
-}
-
-func (p *Position) advance(currentChar byte) {
-	p.Idx++
-	p.Col++
-
-	if currentChar == '\n' {
-		p.Ln++
-		p.Col = 0
-	}
-}
-
-func (p *Position) copy() *Position {
-	return NewPosition(p.Idx, p.Ln, p.Col, p.Fn, p.Ftxt)
-}
-
 // TOKENS //
 
 // TokenType defines the type of token
@@ -102,8 +23,8 @@ const (
 	TT_FLOAT    TokenType = "FLOAT"  //
 	TT_BOOL     TokenType = "BOOL"   //
 	TT_STRING   TokenType = "STRING" //
-	TT_IDEN     TokenType = "IDEN"
-	TT_KEY      TokenType = "KEY"
+	TT_IDEN     TokenType = "IDENTIFIER"
+	TT_KEY      TokenType = "KEYWORD"
 	TT_PLUS     TokenType = "PLUS"  //
 	TT_MINUS    TokenType = "MINUS" //
 	TT_NEG      TokenType = "NEG"   //
@@ -124,7 +45,7 @@ const (
 )
 
 var KEYWORDS = []string{
-	"INT", "FLOAT", "BOOL", "STRING",
+	"int", "float", "bool", "string",
 }
 
 // Token represents a token with its type and value
@@ -192,8 +113,6 @@ func (l *Lexer) make_tokens() ([]Token, error) {
 			l.advance()
 		} else if strings.IndexByte(DIGITS, l.CurrentChar) != -1 {
 			tokens = append(tokens, l.make_number()) // Tokenize number
-		} else if strings.IndexByte(LETTERS, l.CurrentChar) != -1 {
-			tokens = append(tokens, l.make_identifier()) // Tokenize letter
 		} else if l.CurrentChar == '"' {
 			tokens = append(tokens, l.make_string()) // Tokenize string
 		} else if l.peek(4) == "true" || l.peek(5) == "false" {
@@ -233,6 +152,8 @@ func (l *Lexer) make_tokens() ([]Token, error) {
 			l.advanceBy(4)
 			posEnd := l.Pos.copy()
 			tokens = append(tokens, Token{Type: TT_CONC, Value: "CONC", Pos_Start: posStart, Pos_End: posEnd})
+		} else if strings.IndexByte(LETTERS, l.CurrentChar) != -1 {
+			tokens = append(tokens, l.make_identifier()) // Tokenize letter
 		} else if l.peek(2) == "->" {
 			posStart := l.Pos.copy()
 			l.advanceBy(2)
@@ -296,12 +217,12 @@ func (l *Lexer) advanceBy(count int) {
 func (l *Lexer) make_identifier() Token {
 	idStr := ""
 	Pos_Start := l.Pos.copy()
-	tok_Type := TT_IDEN
 
 	for l.CurrentChar != 0 && strings.ContainsAny(string(l.CurrentChar), LETTERS_DIGITS+"_") {
 		idStr += string(l.CurrentChar)
 		l.advance()
 	}
+	tok_Type := TT_IDEN
 
 	for _, keyword := range KEYWORDS {
 		if idStr == keyword {
@@ -371,6 +292,97 @@ func (l *Lexer) make_boolean() Token {
 		return Token{Type: TT_BOOL, Value: "false", Pos_Start: posStart, Pos_End: l.Pos.copy()}
 	}
 	return Token{}
+}
+
+// ERRORS //
+
+type Error struct {
+	ErrorName string
+	Details   string
+	PosStart  *Position
+	PosEnd    *Position
+}
+
+func (e Error) asString() string {
+	result := fmt.Sprintf("%s: %s", e.ErrorName, e.Details)
+	result += fmt.Sprintf(" File %s, line %d", e.PosStart.Fn, e.PosStart.Ln+1)
+	return result
+}
+
+// IllegalCharError struct inheriting from Error
+type IllegalCharError struct {
+	Error
+}
+
+func NewIllegalCharError(posStart, posEnd *Position, details string) *IllegalCharError {
+	return &IllegalCharError{
+		Error: Error{
+			PosStart:  posStart,
+			PosEnd:    posEnd,
+			ErrorName: "Illegal Character",
+			Details:   details,
+		},
+	}
+}
+
+// InvalidSyntaxError struct inheriting from Error
+type InvalidSyntaxError struct {
+	Error
+}
+
+func NewInvalidSyntaxError(posStart, posEnd *Position, details string) *InvalidSyntaxError {
+	return &InvalidSyntaxError{
+		Error: Error{
+			PosStart:  posStart,
+			PosEnd:    posEnd,
+			ErrorName: "Invalid Syntax",
+			Details:   details,
+		},
+	}
+}
+
+// RTERROR //
+type RTError struct {
+	Error
+	Context *Context
+}
+
+func (e *RTError) AsString() string {
+	result := e.Context.GenerateTraceback()
+	result += fmt.Sprintf("%s: %s\n\n", e.ErrorName, e.Details)
+	return result
+}
+
+// POSITION //
+
+type Position struct {
+	Idx  int
+	Ln   int
+	Col  int
+	Fn   string
+	Ftxt string
+}
+
+func NewPosition(idx, ln, col int, fn, ftxt string) *Position {
+	return &Position{Idx: idx, Ln: ln, Col: col, Fn: fn, Ftxt: ftxt}
+}
+
+func (p *Position) asString() string {
+	return fmt.Sprintf("File %s, line %d", p.Fn, p.Ln+1)
+}
+
+func (p *Position) advance(currentChar byte) {
+	p.Idx++
+	p.Col++
+
+	if currentChar == '\n' {
+		p.Ln++
+		p.Col = 0
+	}
+}
+
+func (p *Position) copy() *Position {
+	return NewPosition(p.Idx, p.Ln, p.Col, p.Fn, p.Ftxt)
 }
 
 // NODES //
@@ -577,37 +589,37 @@ func (p *Parser) term() *ParseResult {
 	return p.bin_op(p.factor, []TokenType{TT_MUL, TT_DIV, TT_MOD, TT_CONC})
 }
 
-// Addition and subtraction, lowest precedence
+// Modified expr function to handle variable assignments with types and operations
 func (p *Parser) expr() *ParseResult {
 	res := &ParseResult{}
 
-	if p.Current_Tok.matches(TT_KEY, "INT") {
-		p.advance() // res.register(p.advance())
-
-		if p.Current_Tok.Type != TT_IDEN {
-			return res.failure(NewInvalidSyntaxError(
-				p.Current_Tok.Pos_Start, p.Current_Tok.Pos_End,
-				"Expected identifier",
-			).asString())
-		}
+	// Check for variable and type assignment
+	if p.Current_Tok.Type == TT_IDEN {
 		var_name := p.Current_Tok
 		p.advance()
 
-		if p.Current_Tok.Type != TT_EQ {
-			return res.failure(NewInvalidSyntaxError(
-				p.Current_Tok.Pos_Start, p.Current_Tok.Pos_End,
-				"Expected '->'",
-			).asString())
-		}
-		p.advance()
-		expr := res.register(p.expr())
-		if res.Error != "" {
-			return res
-		}
+		if p.Current_Tok.matches(TT_KEY, "int") { // Expecting 'int' keyword
+			p.advance()
 
-		return res.success(VarAssignNode{Var_Name_Tok: var_name, Value_Node: expr})
+			if p.Current_Tok.Type != TT_EQ { // Expecting '->'
+				return res.failure(NewInvalidSyntaxError(
+					p.Current_Tok.Pos_Start, p.Current_Tok.Pos_End,
+					"Expected '->' after type",
+				).asString())
+			}
+			p.advance()
+
+			// Parse the value expression
+			value_expr := res.register(p.expr())
+			if res.Error != "" {
+				return res
+			}
+
+			return res.success(VarAssignNode{Var_Name_Tok: var_name, Value_Node: value_expr})
+		}
 	}
 
+	// Handle binary operations
 	return p.bin_op(p.term, []TokenType{TT_PLUS, TT_MINUS})
 }
 
@@ -642,23 +654,59 @@ func contains(ops []TokenType, op TokenType) bool {
 	return false
 }
 
+// CONTEXT //
+type Context struct {
+	DisplayName    string
+	Parent         *Context
+	ParentEntryPos *Position
+	Symbol_Table   *SymbolTable
+}
+
+func (c *Context) GenerateTraceback() string {
+	result := ""
+	pos := c.ParentEntryPos
+	ctx := c
+
+	for ctx != nil {
+		result = fmt.Sprintf("File %s, line %d, in %s\n", pos.Fn, pos.Ln+1, ctx.DisplayName) + result // !!!!
+		pos = ctx.ParentEntryPos
+		ctx = ctx.Parent
+	}
+
+	return "Traceback (most recent call last): \n" + result
+}
+
 // SYMBOL TABLE
 type SymbolTable struct {
 	symbols map[string]interface{} // Dictionary to store symbols
 	parent  *SymbolTable           // Pointer to parent symbol table
 }
 
+func NewSymbolTable() *SymbolTable {
+	return &SymbolTable{
+		symbols: make(map[string]interface{}), // Initialize symbols map
+		parent:  nil,
+	}
+}
+
 // Get a value from the symbol table
 func (s *SymbolTable) get(name string) interface{} {
 	value, exists := s.symbols[name]
-	if !exists && s.parent != nil {
+	if exists {
+		fmt.Printf("Variable '%s' found in current scope with value: %v\n", name, value)
+		return value
+	} else if s.parent != nil {
+		fmt.Printf("Variable '%s' not found in current scope. Checking parent scope...\n", name)
 		return s.parent.get(name)
+	} else {
+		fmt.Printf("Variable '%s' not found in any scope!\n", name)
+		return nil // Or return an error indicating variable not found
 	}
-	return value
 }
 
 // Set a value in the symbol table
 func (s *SymbolTable) set(name string, value interface{}) {
+	fmt.Printf("Setting variable '%s' with value: %v\n", name, value)
 	s.symbols[name] = value
 }
 
@@ -670,7 +718,7 @@ func (s *SymbolTable) remove(name string) {
 // INTERPRETER //
 type Interpreter struct{}
 
-func (i Interpreter) visit(node interface{}) (interface{}, error) {
+func (i Interpreter) visit(node interface{}, context *Context) (interface{}, error) {
 	/*  dynamically dispatch based on node type (<3 switch, thanks you for existing)
 	    in Python you could probably make it a bit easier with strings, but i don't care, this works
 		kinda
@@ -679,19 +727,47 @@ func (i Interpreter) visit(node interface{}) (interface{}, error) {
 	case NumberNode:
 		return i.visitNumberNode(node)
 	case BinOpNode:
-		return i.visitBinOpNode(node)
+		return i.visitBinOpNode(node, context)
 	case UnaryOpNode:
-		return i.visitUnaryOpNode(node)
+		return i.visitUnaryOpNode(node, context)
 	case StringNode:
 		return i.visitStringNode(node)
 	case BoolNode:
 		return i.visitBoolNode(node)
+	case VarAccessNode:
+		return i.visitVarAccessNode(node, context)
+	case VarAssignNode:
+		return i.visitVarAssignNode(node, context)
 	default:
 		return nil, fmt.Errorf("No visit method for node type %T", node)
 	}
 }
 
 // Visit methods
+func (i Interpreter) visitVarAccessNode(node VarAccessNode, context *Context) (interface{}, error) {
+	var_name := node.Var_Name_Tok.Value
+
+	// Get the variable value from the context's symbol table
+	value := context.Symbol_Table.get(var_name)
+	if value == nil {
+		return nil, fmt.Errorf("%s is not defined", var_name)
+	}
+	return value, nil
+}
+
+func (i Interpreter) visitVarAssignNode(node VarAssignNode, context *Context) (interface{}, error) {
+	var_name := node.Var_Name_Tok.Value
+
+	// Visit the value to be assigned
+	value, err := i.visit(node.Value_Node, context)
+	if err != nil {
+		return nil, err
+	}
+
+	// Set the variable in the current context's symbol table
+	context.Symbol_Table.set(var_name, value)
+	return value, nil
+}
 
 func (i Interpreter) visitNumberNode(node NumberNode) (interface{}, error) {
 	// it is recommended to return float64 to avoid type mismatch
@@ -711,14 +787,14 @@ func (i Interpreter) visitNumberNode(node NumberNode) (interface{}, error) {
 	return nil, fmt.Errorf("Invalid number type: %s", node.Tok.Type)
 }
 
-func (i Interpreter) visitBinOpNode(node BinOpNode) (interface{}, error) {
+func (i Interpreter) visitBinOpNode(node BinOpNode, context *Context) (interface{}, error) {
 	// Evaluate the left and right nodes
-	leftVal, err := i.visit(node.Left_Node)
+	leftVal, err := i.visit(node.Left_Node, context)
 	if err != nil {
 		return nil, err
 	}
 
-	rightVal, err := i.visit(node.Right_Node)
+	rightVal, err := i.visit(node.Right_Node, context)
 	if err != nil {
 		return nil, err
 	}
@@ -742,7 +818,7 @@ func (i Interpreter) visitBinOpNode(node BinOpNode) (interface{}, error) {
 			return leftFloat * rightFloat, nil
 		case TT_DIV:
 			if rightFloat == 0 {
-				return nil, fmt.Errorf("ERROR: Division by zero")
+				return nil, fmt.Errorf("Division by zero")
 			}
 			return leftFloat / rightFloat, nil
 		case TT_MOD:
@@ -765,9 +841,9 @@ func (i Interpreter) visitBinOpNode(node BinOpNode) (interface{}, error) {
 	return nil, fmt.Errorf("Unknown error")
 }
 
-func (i Interpreter) visitUnaryOpNode(node UnaryOpNode) (interface{}, error) {
+func (i Interpreter) visitUnaryOpNode(node UnaryOpNode, context *Context) (interface{}, error) {
 	// Evaluate the operand
-	val, err := i.visit(node.Node)
+	val, err := i.visit(node.Node, context)
 	if err != nil {
 		return nil, err
 	}
@@ -797,13 +873,14 @@ func (i Interpreter) visitBoolNode(node BoolNode) (interface{}, error) {
 // RUN //
 
 func run(text string, fn string) (interface{}, error) {
-	// Generate Tokens
+	global_symbol_table := NewSymbolTable()
+	global_symbol_table.set("", 0.0) // initialize the symbol table
+
 	lexer := NewLexer(fn, text)
 	tokens, err := lexer.make_tokens()
 	if err != nil {
 		return nil, err
 	}
-
 	// Generate AST
 	parser := NewParser(tokens)
 	res := parser.parse()
@@ -812,9 +889,13 @@ func run(text string, fn string) (interface{}, error) {
 		return nil, fmt.Errorf(res.Error)
 	}
 
-	// Interpret the AST
 	interpreter := Interpreter{}
-	result, err := interpreter.visit(res.Node)
+	context := &Context{
+		DisplayName:  "<program>",
+		Symbol_Table: global_symbol_table,
+	}
+
+	result, err := interpreter.visit(res.Node, context)
 	if err != nil {
 		return nil, err
 	}
