@@ -593,15 +593,16 @@ func (p *Parser) term() *ParseResult {
 func (p *Parser) expr() *ParseResult {
 	res := &ParseResult{}
 
-	// Check for variable and type assignment
+	// Handle variable access
 	if p.Current_Tok.Type == TT_IDEN {
 		var_name := p.Current_Tok
 		p.advance()
 
-		if p.Current_Tok.matches(TT_KEY, "int") { // Expecting 'int' keyword
+		// Check for assignment (e.g., int -> 10)
+		if p.Current_Tok.Type == TT_KEY && p.Current_Tok.matches(TT_KEY, "int") {
 			p.advance()
 
-			if p.Current_Tok.Type != TT_EQ { // Expecting '->'
+			if p.Current_Tok.Type != TT_EQ {
 				return res.failure(NewInvalidSyntaxError(
 					p.Current_Tok.Pos_Start, p.Current_Tok.Pos_End,
 					"Expected '->' after type",
@@ -609,7 +610,6 @@ func (p *Parser) expr() *ParseResult {
 			}
 			p.advance()
 
-			// Parse the value expression
 			value_expr := res.register(p.expr())
 			if res.Error != "" {
 				return res
@@ -617,9 +617,12 @@ func (p *Parser) expr() *ParseResult {
 
 			return res.success(VarAssignNode{Var_Name_Tok: var_name, Value_Node: value_expr})
 		}
+
+		// If it is not an assignment, treat it as a variable access
+		return res.success(VarAccessNode{Var_Name_Tok: var_name})
 	}
 
-	// Handle binary operations
+	// Handle binary operations and other expressions
 	return p.bin_op(p.term, []TokenType{TT_PLUS, TT_MINUS})
 }
 
@@ -691,22 +694,25 @@ func NewSymbolTable() *SymbolTable {
 
 // Get a value from the symbol table
 func (s *SymbolTable) get(name string) interface{} {
+	if name == "" {
+		fmt.Println("Error: Variable name cannot be empty")
+		return nil
+	}
 	value, exists := s.symbols[name]
 	if exists {
-		fmt.Printf("Variable '%s' found in current scope with value: %v\n", name, value)
 		return value
 	} else if s.parent != nil {
-		fmt.Printf("Variable '%s' not found in current scope. Checking parent scope...\n", name)
 		return s.parent.get(name)
-	} else {
-		fmt.Printf("Variable '%s' not found in any scope!\n", name)
-		return nil // Or return an error indicating variable not found
 	}
+	return nil // Or handle variable not found error
 }
 
 // Set a value in the symbol table
 func (s *SymbolTable) set(name string, value interface{}) {
-	fmt.Printf("Setting variable '%s' with value: %v\n", name, value)
+	if name == "" {
+		fmt.Println("Error: Variable name cannot be empty")
+		return
+	}
 	s.symbols[name] = value
 }
 
@@ -747,7 +753,10 @@ func (i Interpreter) visit(node interface{}, context *Context) (interface{}, err
 func (i Interpreter) visitVarAccessNode(node VarAccessNode, context *Context) (interface{}, error) {
 	var_name := node.Var_Name_Tok.Value
 
-	// Get the variable value from the context's symbol table
+	// Print variable name being accessed
+	fmt.Printf("Accessing variable: %s\n", var_name)
+
+	// Retrieve variable from symbol table
 	value := context.Symbol_Table.get(var_name)
 	if value == nil {
 		return nil, fmt.Errorf("%s is not defined", var_name)
@@ -758,13 +767,18 @@ func (i Interpreter) visitVarAccessNode(node VarAccessNode, context *Context) (i
 func (i Interpreter) visitVarAssignNode(node VarAssignNode, context *Context) (interface{}, error) {
 	var_name := node.Var_Name_Tok.Value
 
-	// Visit the value to be assigned
+	// Print variable name and value being assigned
+	fmt.Printf("Assigning variable: %s\n", var_name)
+
 	value, err := i.visit(node.Value_Node, context)
 	if err != nil {
 		return nil, err
 	}
 
-	// Set the variable in the current context's symbol table
+	// Print the value being set
+	fmt.Printf("Value assigned: %v\n", value)
+
+	// Set the variable in the symbol table
 	context.Symbol_Table.set(var_name, value)
 	return value, nil
 }
@@ -874,7 +888,6 @@ func (i Interpreter) visitBoolNode(node BoolNode) (interface{}, error) {
 
 func run(text string, fn string) (interface{}, error) {
 	global_symbol_table := NewSymbolTable()
-	global_symbol_table.set("", 0.0) // initialize the symbol table
 
 	lexer := NewLexer(fn, text)
 	tokens, err := lexer.make_tokens()
