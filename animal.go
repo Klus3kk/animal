@@ -291,6 +291,38 @@ func (l *Lexer) make_boolean() Token {
 	return Token{}
 }
 
+// RTRESULT
+// RTResult is a type that represents the result of an operation
+type RTResult struct {
+	Value interface{}
+	Error error
+}
+
+// NewRTResult creates a new RTResult instance
+func NewRTResult() *RTResult {
+	return &RTResult{}
+}
+
+// Success sets the result value and returns it
+func (r *RTResult) success(value interface{}) *RTResult {
+	r.Value = value
+	return r
+}
+
+// Failure sets the error and returns it
+func (r *RTResult) failure(err error) *RTResult {
+	r.Error = err
+	return r
+}
+
+// Register handles the result of another RTResult, propagating errors if necessary
+func (r *RTResult) register(res *RTResult) interface{} {
+	if res.Error != nil {
+		r.Error = res.Error
+	}
+	return res.Value
+}
+
 // ERRORS //
 
 type Error struct {
@@ -730,11 +762,7 @@ func (s *SymbolTable) remove(name string) {
 // INTERPRETER //
 type Interpreter struct{}
 
-func (i Interpreter) visit(node interface{}, context *Context) (interface{}, error) {
-	/*  dynamically dispatch based on node type (<3 switch, thanks you for existing)
-	    in Python you could probably make it a bit easier with strings, but i don't care, this works
-		kinda
-	*/
+func (i *Interpreter) visit(node interface{}, context *Context) *RTResult {
 	switch node := node.(type) {
 	case NumberNode:
 		return i.visitNumberNode(node)
@@ -751,163 +779,185 @@ func (i Interpreter) visit(node interface{}, context *Context) (interface{}, err
 	case VarAssignNode:
 		return i.visitVarAssignNode(node, context)
 	default:
-		return nil, fmt.Errorf("No visit method for node type %T", node)
+		res := NewRTResult()
+		return res.failure(fmt.Errorf("No visit method for node type %T", node))
 	}
 }
 
 // Visit methods
-func (i Interpreter) visitVarAccessNode(node VarAccessNode, context *Context) (interface{}, error) {
-	var_name := node.Var_Name_Tok.Value
-	value := context.Symbol_Table.get(var_name)
+func (i *Interpreter) visitVarAccessNode(node VarAccessNode, context *Context) *RTResult {
+	res := NewRTResult()
+	varName := node.Var_Name_Tok.Value
+	value := context.Symbol_Table.get(varName)
+
 	if value == nil {
-		fmt.Printf("Variable %s not found in context\n", var_name) // Added debug
-		return nil, fmt.Errorf("%s is not defined", var_name)
+		return res.failure(fmt.Errorf("'%s' is not defined", varName))
 	}
-	fmt.Printf("Accessing variable %s with value %v\n", var_name, value)
-	return value, nil
+	return res.success(value)
 }
 
-func (i Interpreter) visitVarAssignNode(node VarAssignNode, context *Context) (interface{}, error) {
-	var_name := node.Var_Name_Tok.Value
-	value, err := i.visit(node.Value_Node, context)
-	if err != nil {
-		return nil, err
+func (i *Interpreter) visitVarAssignNode(node VarAssignNode, context *Context) *RTResult {
+	res := NewRTResult()
+	varName := node.Var_Name_Tok.Value
+	value := res.register(i.visit(node.Value_Node, context))
+	if res.Error != nil {
+		return res
 	}
 
-	fmt.Printf("Assigning variable %s with value %v\n", var_name, value)
-	context.Symbol_Table.set(var_name, value)
-	return value, nil
+	context.Symbol_Table.set(varName, value)
+	return res.success(value)
 }
 
-func (i Interpreter) visitNumberNode(node NumberNode) (interface{}, error) {
-	// it is recommended to return float64 to avoid type mismatch
+// Updated functions to use RTResult
+
+func (i *Interpreter) visitNumberNode(node NumberNode) *RTResult {
+	res := NewRTResult()
+
+	// Evaluate the number based on its type
 	if node.Tok.Type == TT_INT {
 		val, err := strconv.Atoi(node.Tok.Value)
 		if err != nil {
-			return nil, err
+			return res.failure(err)
 		}
-		return float64(val), nil
+		return res.success(float64(val))
 	} else if node.Tok.Type == TT_FLOAT {
 		val, err := strconv.ParseFloat(node.Tok.Value, 64)
 		if err != nil {
-			return nil, err
+			return res.failure(err)
 		}
-		return val, nil
+		return res.success(val)
 	}
-	return nil, fmt.Errorf("Invalid number type: %s", node.Tok.Type)
+	return res.failure(fmt.Errorf("Invalid number type: %s", node.Tok.Type))
 }
 
-func (i Interpreter) visitBinOpNode(node BinOpNode, context *Context) (interface{}, error) {
+func (i *Interpreter) visitBinOpNode(node BinOpNode, context *Context) *RTResult {
+	res := NewRTResult()
+
 	// Evaluate the left and right nodes
-	leftVal, err := i.visit(node.Left_Node, context)
-	if err != nil {
-		return nil, err
+	leftResult := i.visit(node.Left_Node, context)
+	if leftResult.Error != nil {
+		return res.failure(leftResult.Error)
 	}
 
-	rightVal, err := i.visit(node.Right_Node, context)
-	if err != nil {
-		return nil, err
+	rightResult := i.visit(node.Right_Node, context)
+	if rightResult.Error != nil {
+		return res.failure(rightResult.Error)
 	}
 
 	// Apply the operator based on node.Op_Tok
 	switch node.Op_Tok.Type {
 	case TT_PLUS, TT_MINUS, TT_MUL, TT_DIV, TT_MOD, TT_EXP:
 		// Handle arithmetic operations
-		leftFloat, okLeft := leftVal.(float64)
-		rightFloat, okRight := rightVal.(float64)
+		leftFloat, okLeft := leftResult.Value.(float64)
+		rightFloat, okRight := rightResult.Value.(float64)
 		if !okLeft || !okRight {
-			return nil, fmt.Errorf("Expected numbers for arithmetic operations")
+			return res.failure(fmt.Errorf("Expected numbers for arithmetic operations"))
 		}
 
 		switch node.Op_Tok.Type {
 		case TT_PLUS:
-			return leftFloat + rightFloat, nil
+			return res.success(leftFloat + rightFloat)
 		case TT_MINUS:
-			return leftFloat - rightFloat, nil
+			return res.success(leftFloat - rightFloat)
 		case TT_MUL:
-			return leftFloat * rightFloat, nil
+			return res.success(leftFloat * rightFloat)
 		case TT_DIV:
 			if rightFloat == 0 {
-				return nil, fmt.Errorf("Division by zero")
+				return res.failure(fmt.Errorf("Division by zero"))
 			}
-			return leftFloat / rightFloat, nil
+			return res.success(leftFloat / rightFloat)
 		case TT_MOD:
-			return math.Mod(leftFloat, rightFloat), nil
+			return res.success(math.Mod(leftFloat, rightFloat))
 		case TT_EXP:
-			return math.Pow(leftFloat, rightFloat), nil
+			return res.success(math.Pow(leftFloat, rightFloat))
 		}
 
 	case TT_CONC:
-		leftStr, okLeft := leftVal.(string)
-		rightStr, okRight := rightVal.(string)
+		leftStr, okLeft := leftResult.Value.(string)
+		rightStr, okRight := rightResult.Value.(string)
 		if okLeft && okRight {
-			return leftStr + rightStr, nil
+			return res.success(leftStr + rightStr)
 		}
-		return nil, fmt.Errorf("Cannot concatenate non-string types")
-	default:
-		return nil, fmt.Errorf("Unknown operator: %s", node.Op_Tok.Value)
-	}
+		return res.failure(fmt.Errorf("Cannot concatenate non-string types"))
 
-	return nil, fmt.Errorf("Unknown error")
+	default:
+		return res.failure(fmt.Errorf("Unknown operator: %s", node.Op_Tok.Value))
+	}
+	return res.failure(fmt.Errorf("Unknown error"))
 }
 
-func (i Interpreter) visitUnaryOpNode(node UnaryOpNode, context *Context) (interface{}, error) {
+func (i *Interpreter) visitUnaryOpNode(node UnaryOpNode, context *Context) *RTResult {
+	res := NewRTResult()
+
 	// Evaluate the operand
-	val, err := i.visit(node.Node, context)
-	if err != nil {
-		return nil, err
+	valResult := i.visit(node.Node, context)
+	if valResult.Error != nil {
+		return res.failure(valResult.Error)
 	}
 
 	// Apply the unary operator
 	switch node.Op_Tok.Type {
 	case TT_POS:
-		return +val.(float64), nil
+		if val, ok := valResult.Value.(float64); ok {
+			return res.success(+val)
+		}
+		return res.failure(fmt.Errorf("Unary positive operation requires a number"))
 	case TT_NEG:
-		return -val.(float64), nil
+		if val, ok := valResult.Value.(float64); ok {
+			return res.success(-val)
+		}
+		return res.failure(fmt.Errorf("Unary negation operation requires a number"))
 	default:
-		return nil, fmt.Errorf("Unknown unary operator: %s", node.Op_Tok.Type)
+		return res.failure(fmt.Errorf("Unknown unary operator: %s", node.Op_Tok.Type))
 	}
 }
 
-func (i Interpreter) visitStringNode(node StringNode) (interface{}, error) {
-	return node.Tok.Value, nil
+func (i *Interpreter) visitStringNode(node StringNode) *RTResult {
+	res := NewRTResult()
+	return res.success(node.Tok.Value)
 }
 
-func (i Interpreter) visitBoolNode(node BoolNode) (interface{}, error) {
+func (i *Interpreter) visitBoolNode(node BoolNode) *RTResult {
+	res := NewRTResult()
 	if node.Tok.Value == "true" {
-		return true, nil
+		return res.success(true)
 	}
-	return false, nil
+	return res.success(false)
 }
 
 // RUN //
 
 func run(text string, fn string) (interface{}, error) {
-	global_symbol_table := NewSymbolTable()
+	// Create a new global symbol table
+	globalSymbolTable := NewSymbolTable()
 
+	// Initialize the lexer and generate tokens
 	lexer := NewLexer(fn, text)
 	tokens, err := lexer.make_tokens()
 	if err != nil {
 		return nil, err
 	}
-	// Generate AST
-	parser := NewParser(tokens)
-	res := parser.parse()
 
-	if res.Error != "" {
-		return nil, fmt.Errorf(res.Error)
+	// Parse the tokens to generate the AST
+	parser := NewParser(tokens)
+	parseResult := parser.parse()
+
+	if parseResult.Error != "" {
+		return nil, fmt.Errorf(parseResult.Error)
 	}
 
+	// Create an interpreter and a context
 	interpreter := Interpreter{}
 	context := &Context{
 		DisplayName:  "<program>",
-		Symbol_Table: global_symbol_table,
+		Symbol_Table: globalSymbolTable,
 	}
 
-	result, err := interpreter.visit(res.Node, context)
-	if err != nil {
-		return nil, err
+	// Evaluate the AST
+	evalResult := interpreter.visit(parseResult.Node, context)
+	if evalResult.Error != nil {
+		return nil, evalResult.Error
 	}
 
-	return result, nil
+	return evalResult.Value, nil
 }
