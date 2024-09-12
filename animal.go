@@ -490,10 +490,13 @@ func (p *Parser) advance() Token {
 
 func (p *Parser) parse() *ParseResult {
 	res := p.expr()
-	if res.Error == "" && p.Current_Tok.Type != TT_EOF {
+	if res.Error != "" {
+		return res
+	}
+	if p.Current_Tok.Type != TT_EOF {
 		return res.failure(NewInvalidSyntaxError(
 			p.Current_Tok.Pos_Start, p.Current_Tok.Pos_End,
-			"Expected 'meow', 'woof', 'moo', 'drone'",
+			"Unexpected Token",
 		).asString())
 	}
 	return res
@@ -679,6 +682,7 @@ func (c *Context) GenerateTraceback() string {
 }
 
 // SYMBOL TABLE
+// SYMBOL TABLE
 type SymbolTable struct {
 	symbols map[string]interface{} // Dictionary to store symbols
 	parent  *SymbolTable           // Pointer to parent symbol table
@@ -691,7 +695,7 @@ func NewSymbolTable() *SymbolTable {
 	}
 }
 
-// Get a value from the symbol table
+// Set a value in the symbol table
 func (s *SymbolTable) set(name string, value interface{}) {
 	if name == "" {
 		fmt.Println("Error: Variable name cannot be empty")
@@ -701,13 +705,13 @@ func (s *SymbolTable) set(name string, value interface{}) {
 	s.symbols[name] = value
 }
 
+// Get a value from the symbol table
 func (s *SymbolTable) get(name string) interface{} {
 	if name == "" {
 		fmt.Println("Error: Variable name cannot be empty")
 		return nil
 	}
-	value, exists := s.symbols[name]
-	if exists {
+	if value, exists := s.symbols[name]; exists {
 		fmt.Printf("Getting variable %s with value %v from context\n", name, value)
 		return value
 	} else if s.parent != nil {
