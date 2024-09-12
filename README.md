@@ -23,7 +23,7 @@ You can test the language by writing:
 
 ## Instruction
 
-Operators:
+**Operators:**
 
 * "*" - moo,
 * "+" - meow,
@@ -32,7 +32,7 @@ Operators:
 * "%" - squeak,
 * "^" - soar.
 
-Brackets:
+**Brackets:**
 
 * () - round,
 * [] - square,
