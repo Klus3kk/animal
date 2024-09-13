@@ -38,4 +38,3 @@ You can test the language by writing:
 * [] - square,
 * {} - curly.
 
-**Status: In progress.**
