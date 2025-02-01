@@ -24,7 +24,7 @@ func main() {
 		ast, err := run(input, "<stdin>")
 		if err != nil {
 			fmt.Println(err)
-		} else {
+		} else if ast != nil {
 			fmt.Println(ast) // Print the AST
 		}
 	}

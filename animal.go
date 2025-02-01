@@ -42,7 +42,7 @@ const (
 )
 
 var KEYWORDS = []string{
-	"int", "float", "bool", "string",
+	"int", "float", "bool", "string", "growl", "sniff", "wag", "roar",
 }
 
 // Token represents a token with its type and value
@@ -192,6 +192,11 @@ func (l *Lexer) make_tokens() ([]Token, error) {
 			l.advance()
 			posEnd := l.Pos.copy()
 			tokens = append(tokens, Token{Type: TT_POS, Value: string(l.CurrentChar), Pos_Start: posStart, Pos_End: posEnd})
+		} else if l.peek(4) == "roar" {
+			posStart := l.Pos.copy()
+			l.advanceBy(4)
+			posEnd := l.Pos.copy()
+			tokens = append(tokens, Token{Type: TT_KEY, Value: "roar", Pos_Start: posStart, Pos_End: posEnd})
 		} else {
 			// Handling illegal characters
 			posStart := l.Pos.copy()
@@ -289,6 +294,14 @@ func (l *Lexer) make_boolean() Token {
 		return Token{Type: TT_BOOL, Value: "false", Pos_Start: posStart, Pos_End: l.Pos.copy()}
 	}
 	return Token{}
+}
+// ROARNODE (print)
+type RoarNode struct {
+    Value interface{}
+}
+
+func (n RoarNode) String() string {
+    return fmt.Sprintf("(ROAR %v)", n.Value)
 }
 
 // RTRESULT
@@ -495,6 +508,28 @@ func (pr *ParseResult) failure(error string) *ParseResult {
 	return pr
 }
 
+func (p *Parser) roar_expr() *ParseResult {
+    res := &ParseResult{}
+
+    if !p.Current_Tok.matches(TT_KEY, "roar") {
+        return res.failure("Expected 'roar'")
+    }
+    p.advance()
+
+	if p.Current_Tok.Type == TT_EOF || p.Current_Tok.Type == TT_KEY {
+        return res.success(RoarNode{Value: nil}) 
+    }
+
+
+    expr := res.register(p.expr())
+    if res.Error != "" {
+        return res
+    }
+
+    return res.success(RoarNode{Value: expr})
+}
+
+
 // PARSER //
 
 type Parser struct {
@@ -624,6 +659,11 @@ func (p *Parser) term() *ParseResult {
 // Modified expr function to handle variable assignments with types and operations
 func (p *Parser) expr() *ParseResult {
 	res := &ParseResult{}
+
+	// Print statement
+	if p.Current_Tok.matches(TT_KEY, "roar") {
+        return p.roar_expr()
+    }
 
 	// Handle variable access
 	if p.Current_Tok.Type == TT_IDEN {
@@ -764,6 +804,8 @@ type Interpreter struct{}
 
 func (i *Interpreter) visit(node interface{}, context *Context) *RTResult {
 	switch node := node.(type) {
+	case RoarNode:
+		return i.visitRoarNode(node, context)
 	case NumberNode:
 		return i.visitNumberNode(node)
 	case BinOpNode:
@@ -782,6 +824,23 @@ func (i *Interpreter) visit(node interface{}, context *Context) *RTResult {
 		res := NewRTResult()
 		return res.failure(fmt.Errorf("No visit method for node type %T", node))
 	}
+}
+
+func (i *Interpreter) visitRoarNode(node RoarNode, context *Context) *RTResult {
+    res := NewRTResult()
+
+	if node.Value == nil {
+        fmt.Println()
+        return res.success(nil)
+    }
+	
+    value := res.register(i.visit(node.Value, context))
+    if res.Error != nil {
+        return res
+    }
+
+    fmt.Println(value) 
+    return res.success(nil)
 }
 
 // Visit methods
