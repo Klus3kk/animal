@@ -32,6 +32,12 @@ const (
 	TT_EXP      = "EXP"   //
 	TT_CONC     = "CONC"  //
 	TT_EQ       = "EQ"
+	TT_GT 		= "GT"
+	TT_LT 		= "LT"
+	TT_GTE 		= "GTE"
+	TT_LTE		= "LTE"
+	TT_EQEQ		= "EQEQ"
+	TT_NEQ		= "NEQ"
 	TT_LROUNDBR = "LROUNDBR" //
 	TT_RROUNDBR = "RROUNDBR" //
 	TT_RSQRBR   = "RSQRBR"   //
@@ -182,6 +188,36 @@ func (l *Lexer) make_tokens() ([]Token, error) {
 			posStart := l.Pos.copy()
 			l.advance()
 			tokens = append(tokens, Token{Type: TT_RCURLBR, Value: "}", Pos_Start: posStart, Pos_End: l.Pos.copy()})
+		} else if l.peek(2) == ">=" {
+			posStart := l.Pos.copy()
+			l.advanceBy(2)
+			posEnd := l.Pos.copy()
+			tokens = append(tokens, Token{Type: TT_GTE, Value: ">=", Pos_Start: posStart, Pos_End: posEnd})
+		} else if l.peek(2) == "<=" {
+			posStart := l.Pos.copy()
+			l.advanceBy(2)
+			posEnd := l.Pos.copy()
+			tokens = append(tokens, Token{Type: TT_LTE, Value: "<=", Pos_Start: posStart, Pos_End: posEnd})
+		} else if l.peek(2) == "==" {
+			posStart := l.Pos.copy()
+			l.advanceBy(2)
+			posEnd := l.Pos.copy()
+			tokens = append(tokens, Token{Type: TT_EQEQ, Value: "==", Pos_Start: posStart, Pos_End: posEnd})
+		} else if l.peek(2) == "!=" {
+			posStart := l.Pos.copy()
+			l.advanceBy(2)
+			posEnd := l.Pos.copy()
+			tokens = append(tokens, Token{Type: TT_NEQ, Value: "!=", Pos_Start: posStart, Pos_End: posEnd})
+		} else if l.CurrentChar == '>' {
+			posStart := l.Pos.copy()
+			l.advance()
+			posEnd := l.Pos.copy()
+			tokens = append(tokens, Token{Type: TT_GT, Value: ">", Pos_Start: posStart, Pos_End: posEnd})
+		} else if l.CurrentChar == '<' {
+			posStart := l.Pos.copy()
+			l.advance()
+			posEnd := l.Pos.copy()
+			tokens = append(tokens, Token{Type: TT_LT, Value: "<", Pos_Start: posStart, Pos_End: posEnd})
 		} else if l.CurrentChar == '-' {
 			posStart := l.Pos.copy()
 			l.advance()
@@ -295,6 +331,23 @@ func (l *Lexer) make_boolean() Token {
 	}
 	return Token{}
 }
+// GROWLNODE (if, else if, else)
+type GrowlNode struct {
+    Cases      []ConditionBlock // List of conditions and bodies
+    ElseCase   interface{}      // Optional else case
+}
+
+func (n GrowlNode) String() string {
+	return fmt.Sprintf("(GROWL %v ELSE %v)", n.Cases, n.ElseCase)
+}
+
+// For one condition-body pair
+type ConditionBlock struct {
+	Condition interface{}
+	Body 	  interface{}
+}
+
+
 // ROARNODE (print)
 type RoarNode struct {
     Value interface{}
@@ -529,6 +582,90 @@ func (p *Parser) roar_expr() *ParseResult {
     return res.success(RoarNode{Value: expr})
 }
 
+func (p *Parser) growl_expr() *ParseResult {
+    res := &ParseResult{}
+    cases := []ConditionBlock{}
+    var elseCase interface{}
+
+    // Handle "growl" (if)
+    if !p.Current_Tok.matches(TT_KEY, "growl") {
+        return res.failure("Expected 'growl'")
+    }
+    p.advance()
+
+    condition := res.register(p.expr())
+    if res.Error != "" {
+        return res
+    }
+
+    if p.Current_Tok.Type != TT_LCURLBR { // Expecting '{'
+        return res.failure("Expected '{' after growl condition")
+    }
+    p.advance()
+
+    body := res.register(p.expr())
+    if res.Error != "" {
+        return res
+    }
+
+    if p.Current_Tok.Type != TT_RCURLBR { // Expecting '}'
+        return res.failure("Expected '}' after growl body")
+    }
+    p.advance()
+
+    cases = append(cases, ConditionBlock{Condition: condition, Body: body})
+
+    // Handle "sniff" (else-if)
+    for p.Current_Tok.matches(TT_KEY, "sniff") {
+        p.advance()
+
+        condition := res.register(p.expr())
+        if res.Error != "" {
+            return res
+        }
+
+        if p.Current_Tok.Type != TT_LCURLBR {
+            return res.failure("Expected '{' after sniff condition")
+        }
+        p.advance()
+
+        body := res.register(p.expr())
+        if res.Error != "" {
+            return res
+        }
+
+        if p.Current_Tok.Type != TT_RCURLBR {
+            return res.failure("Expected '}' after sniff body")
+        }
+        p.advance()
+
+        cases = append(cases, ConditionBlock{Condition: condition, Body: body})
+    }
+
+    // Handle "wag" (else)
+    if p.Current_Tok.matches(TT_KEY, "wag") {
+        p.advance()
+
+        if p.Current_Tok.Type != TT_LCURLBR {
+            return res.failure("Expected '{' after wag")
+        }
+        p.advance()
+
+        elseCase = res.register(p.expr())
+        if res.Error != "" {
+            return res
+        }
+
+        if p.Current_Tok.Type != TT_RCURLBR {
+            return res.failure("Expected '}' after wag body")
+        }
+        p.advance()
+    }
+
+    return res.success(GrowlNode{Cases: cases, ElseCase: elseCase})
+}
+
+
 
 // PARSER //
 
@@ -663,7 +800,9 @@ func (p *Parser) expr() *ParseResult {
 	// Print statement
 	if p.Current_Tok.matches(TT_KEY, "roar") {
         return p.roar_expr()
-    }
+    } else if p.Current_Tok.matches(TT_KEY, "growl") {
+		return p.growl_expr()
+	}
 
 	// Handle variable access
 	if p.Current_Tok.Type == TT_IDEN {
@@ -697,28 +836,28 @@ func (p *Parser) expr() *ParseResult {
 	}
 
 	// Handle binary operations and other expressions
-	return p.bin_op(p.term, []string{TT_PLUS, TT_MINUS})
+	return p.bin_op(p.term, []string{TT_PLUS, TT_MINUS, TT_GT, TT_LT, TT_GTE, TT_LTE, TT_EQEQ, TT_NEQ})
 }
 
 // The bin_op function ensures the correct precedence for binary operations
 func (p *Parser) bin_op(funcToCall func() *ParseResult, ops []string) *ParseResult {
-	res := &ParseResult{}
-	left := res.register(funcToCall())
-	if res.Error != "" {
-		return res
-	}
+    res := &ParseResult{}
+    left := res.register(funcToCall())
+    if res.Error != "" {
+        return res
+    }
 
-	for p.Current_Tok.Type != TT_EOF && contains(ops, p.Current_Tok.Type) {
-		op_tok := p.Current_Tok
-		p.advance()
-		right := res.register(funcToCall())
-		if res.Error != "" {
-			return res
-		}
-		left = BinOpNode{Left_Node: left, Op_Tok: op_tok, Right_Node: right}
-	}
+    for p.Current_Tok.Type != TT_EOF && contains(ops, p.Current_Tok.Type) {
+        op_tok := p.Current_Tok
+        p.advance()
+        right := res.register(funcToCall())
+        if res.Error != "" {
+            return res
+        }
+        left = BinOpNode{Left_Node: left, Op_Tok: op_tok, Right_Node: right}
+    }
 
-	return res.success(left)
+    return res.success(left)
 }
 
 // Utility function to check if a TokenType is in the list
@@ -820,6 +959,8 @@ func (i *Interpreter) visit(node interface{}, context *Context) *RTResult {
 		return i.visitVarAccessNode(node, context)
 	case VarAssignNode:
 		return i.visitVarAssignNode(node, context)
+	case GrowlNode:
+        return i.visitGrowlNode(node, context)
 	default:
 		res := NewRTResult()
 		return res.failure(fmt.Errorf("No visit method for node type %T", node))
@@ -842,6 +983,28 @@ func (i *Interpreter) visitRoarNode(node RoarNode, context *Context) *RTResult {
     fmt.Println(value) 
     return res.success(nil)
 }
+
+func (i *Interpreter) visitGrowlNode(node GrowlNode, context *Context) *RTResult {
+    res := NewRTResult()
+
+    for _, caseBlock := range node.Cases {
+        condition := res.register(i.visit(caseBlock.Condition, context))
+        if res.Error != nil {
+            return res
+        }
+
+        if condition.(bool) {
+            return res.success(res.register(i.visit(caseBlock.Body, context)))
+        }
+    }
+
+    if node.ElseCase != nil {
+        return res.success(res.register(i.visit(node.ElseCase, context)))
+    }
+
+    return res.success(nil)
+}
+
 
 // Visit methods
 func (i *Interpreter) visitVarAccessNode(node VarAccessNode, context *Context) *RTResult {
@@ -890,60 +1053,88 @@ func (i *Interpreter) visitNumberNode(node NumberNode) *RTResult {
 }
 
 func (i *Interpreter) visitBinOpNode(node BinOpNode, context *Context) *RTResult {
-	res := NewRTResult()
+    res := NewRTResult()
 
-	// Evaluate the left and right nodes
-	leftResult := i.visit(node.Left_Node, context)
-	if leftResult.Error != nil {
-		return res.failure(leftResult.Error)
-	}
+    // Evaluate the left and right nodes
+    leftResult := i.visit(node.Left_Node, context)
+    if leftResult.Error != nil {
+        return res.failure(leftResult.Error)
+    }
 
-	rightResult := i.visit(node.Right_Node, context)
-	if rightResult.Error != nil {
-		return res.failure(rightResult.Error)
-	}
+    rightResult := i.visit(node.Right_Node, context)
+    if rightResult.Error != nil {
+        return res.failure(rightResult.Error)
+    }
 
-	// Apply the operator based on node.Op_Tok
-	switch node.Op_Tok.Type {
-	case TT_PLUS, TT_MINUS, TT_MUL, TT_DIV, TT_MOD, TT_EXP:
-		// Handle arithmetic operations
-		leftFloat, okLeft := leftResult.Value.(float64)
-		rightFloat, okRight := rightResult.Value.(float64)
-		if !okLeft || !okRight {
-			return res.failure(fmt.Errorf("Expected numbers for arithmetic operations"))
-		}
+    leftValue := leftResult.Value
+    rightValue := rightResult.Value
 
-		switch node.Op_Tok.Type {
-		case TT_PLUS:
-			return res.success(leftFloat + rightFloat)
-		case TT_MINUS:
-			return res.success(leftFloat - rightFloat)
-		case TT_MUL:
-			return res.success(leftFloat * rightFloat)
-		case TT_DIV:
-			if rightFloat == 0 {
-				return res.failure(fmt.Errorf("Division by zero"))
-			}
-			return res.success(leftFloat / rightFloat)
-		case TT_MOD:
-			return res.success(math.Mod(leftFloat, rightFloat))
-		case TT_EXP:
-			return res.success(math.Pow(leftFloat, rightFloat))
-		}
+    switch node.Op_Tok.Type {
+    case TT_PLUS, TT_MINUS, TT_MUL, TT_DIV, TT_MOD, TT_EXP:
+        // Handle arithmetic operations
+        leftFloat, okLeft := leftValue.(float64)
+        rightFloat, okRight := rightValue.(float64)
+        if !okLeft || !okRight {
+            return res.failure(fmt.Errorf("Expected numbers for arithmetic operations"))
+        }
 
-	case TT_CONC:
-		leftStr, okLeft := leftResult.Value.(string)
-		rightStr, okRight := rightResult.Value.(string)
-		if okLeft && okRight {
-			return res.success(leftStr + rightStr)
-		}
-		return res.failure(fmt.Errorf("Cannot concatenate non-string types"))
+        switch node.Op_Tok.Type {
+        case TT_PLUS:
+            return res.success(leftFloat + rightFloat)
+        case TT_MINUS:
+            return res.success(leftFloat - rightFloat)
+        case TT_MUL:
+            return res.success(leftFloat * rightFloat)
+        case TT_DIV:
+            if rightFloat == 0 {
+                return res.failure(fmt.Errorf("Division by zero"))
+            }
+            return res.success(leftFloat / rightFloat)
+        case TT_MOD:
+            return res.success(math.Mod(leftFloat, rightFloat))
+        case TT_EXP:
+            return res.success(math.Pow(leftFloat, rightFloat))
+        }
 
-	default:
-		return res.failure(fmt.Errorf("Unknown operator: %s", node.Op_Tok.Value))
-	}
-	return res.failure(fmt.Errorf("Unknown error"))
+    case TT_CONC:
+        // Handle string concatenation
+        leftStr, okLeft := leftValue.(string)
+        rightStr, okRight := rightValue.(string)
+        if okLeft && okRight {
+            return res.success(leftStr + rightStr)
+        }
+        return res.failure(fmt.Errorf("Cannot concatenate non-string types"))
+
+    // Comparison Operators
+    case TT_GT, TT_LT, TT_GTE, TT_LTE, TT_EQEQ, TT_NEQ:
+        leftFloat, okLeft := leftValue.(float64)
+        rightFloat, okRight := rightValue.(float64)
+        if !okLeft || !okRight {
+            return res.failure(fmt.Errorf("Expected numbers for comparison operations"))
+        }
+
+        switch node.Op_Tok.Type {
+        case TT_GT:
+            return res.success(leftFloat > rightFloat)
+        case TT_LT:
+            return res.success(leftFloat < rightFloat)
+        case TT_GTE:
+            return res.success(leftFloat >= rightFloat)
+        case TT_LTE:
+            return res.success(leftFloat <= rightFloat)
+        case TT_EQEQ:
+            return res.success(leftFloat == rightFloat)
+        case TT_NEQ:
+            return res.success(leftFloat != rightFloat)
+        }
+
+    default:
+        return res.failure(fmt.Errorf("Unknown operator: %s", node.Op_Tok.Value))
+    }
+
+    return res.failure(fmt.Errorf("Unknown error"))
 }
+
 
 func (i *Interpreter) visitUnaryOpNode(node UnaryOpNode, context *Context) *RTResult {
 	res := NewRTResult()
