@@ -2,12 +2,31 @@ package main
 
 import (
 	"bufio"
-	"fmt"
 	"os"
 	"strings"
+	"fmt"
 )
 
+func debugParse(input string) {
+	lexer := NewLexer("<stdin>", input)
+	tokens, err := lexer.make_tokens()
+	if err != nil {
+		fmt.Println("Lexer error:", err)
+		return
+	}
+	fmt.Println("Tokens:", tokens)
+
+	parser := NewParser(tokens)
+	parseResult := parser.parse()
+	if parseResult.Error != "" {
+		fmt.Println("Parser error:", parseResult.Error)
+	} else {
+		fmt.Println("AST:", parseResult.Node)
+	}
+}
+
 func main() {
+	// debugParse("x -> 0")
 	reader := bufio.NewReader(os.Stdin)
 	for {
 		fmt.Print(">> ")

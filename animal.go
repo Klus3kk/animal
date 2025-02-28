@@ -562,6 +562,10 @@ type VarAssignNode struct {
 	Value_Node   interface{}
 }
 
+func (n VarAssignNode) String() string {
+	return fmt.Sprintf("(VarAssignNode %s -> %v)", n.Var_Name_Tok.Value, n.Value_Node)
+}
+
 // PARSE RESULT //
 
 type ParseResult struct {
@@ -849,8 +853,7 @@ func (p *Parser) expr() *ParseResult {
         var_name := p.Current_Tok
         p.advance()
 
-        // Handle standard assignment (e.g., x -> 5)
-        if p.Current_Tok.matches(TT_EQ, "->") {
+        if p.Current_Tok.Type == TT_EQ {
             p.advance()
 
             value_expr := res.register(p.expr()) // Get value expression (e.g., 5)
@@ -858,10 +861,12 @@ func (p *Parser) expr() *ParseResult {
                 return res
             }
 
+            // Debug output
+            fmt.Printf("Parsed assignment: %s -> %v\n", var_name.Value, value_expr)
+
             return res.success(VarAssignNode{Var_Name_Tok: var_name, Value_Node: value_expr})
         }
 
-        // If it's not an assignment, treat it as variable access
         return res.success(VarAccessNode{Var_Name_Tok: var_name})
     }
 
@@ -1174,10 +1179,12 @@ func (i *Interpreter) visitVarAssignNode(node VarAssignNode, context *Context) *
         return res
     }
 
-    fmt.Printf("Assigning %s -> %v\n", varName, value) // Debug output
+    fmt.Printf("Assigning variable: %s -> %v\n", varName, value) // Debug output
+
     context.Symbol_Table.set(varName, value)
     return res.success(value)
 }
+
 
 
 // Updated functions to use RTResult
