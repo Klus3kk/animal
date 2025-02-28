@@ -48,8 +48,12 @@ const (
 )
 
 var KEYWORDS = []string{
-	"int", "float", "bool", "string", "growl", "sniff", "wag", "roar",
+    "int", "float", "bool", "string",
+    "growl", "sniff", "wag",  // if, elif, else
+    "roar",                   // print
+    "pounce", "leap",         // while, for
 }
+
 
 // Token represents a token with its type and value
 type Token struct {
@@ -155,6 +159,16 @@ func (l *Lexer) make_tokens() ([]Token, error) {
 			l.advanceBy(4)
 			posEnd := l.Pos.copy()
 			tokens = append(tokens, Token{Type: TT_CONC, Value: "CONC", Pos_Start: posStart, Pos_End: posEnd})
+		} else if l.peek(6) == "pounce" {
+			posStart := l.Pos.copy()
+			l.advanceBy(6)
+			posEnd := l.Pos.copy()
+			tokens = append(tokens, Token{Type: TT_KEY, Value: "pounce", Pos_Start: posStart, Pos_End: posEnd})
+		} else if l.peek(4) == "leap" {
+			posStart := l.Pos.copy()
+			l.advanceBy(4)
+			posEnd := l.Pos.copy()
+			tokens = append(tokens, Token{Type: TT_KEY, Value: "leap", Pos_Start: posStart, Pos_End: posEnd})
 		} else if strings.IndexByte(LETTERS, l.CurrentChar) != -1 {
 			tokens = append(tokens, l.make_identifier()) // Tokenize letter
 		} else if l.peek(2) == "->" {
@@ -339,6 +353,20 @@ type GrowlNode struct {
 
 func (n GrowlNode) String() string {
 	return fmt.Sprintf("(GROWL %v ELSE %v)", n.Cases, n.ElseCase)
+}
+// WHILE/FOR LOOPS
+// Node for pounce (while) loops
+type PounceNode struct {
+    Condition interface{}
+    Body      []interface{}
+}
+
+// Node for leap (for) loops
+type LeapNode struct {
+    VarName   Token
+    StartExpr interface{}
+    EndExpr   interface{}
+    Body      interface{}
 }
 
 // For one condition-body pair
@@ -795,49 +823,165 @@ func (p *Parser) term() *ParseResult {
 
 // Modified expr function to handle variable assignments with types and operations
 func (p *Parser) expr() *ParseResult {
-	res := &ParseResult{}
+    res := &ParseResult{}
 
-	// Print statement
-	if p.Current_Tok.matches(TT_KEY, "roar") {
+    // Print statement
+    if p.Current_Tok.matches(TT_KEY, "roar") {
         return p.roar_expr()
-    } else if p.Current_Tok.matches(TT_KEY, "growl") {
-		return p.growl_expr()
-	}
+    }
 
-	// Handle variable access
-	if p.Current_Tok.Type == TT_IDEN {
-		var_name := p.Current_Tok
-		p.advance()
+    // Conditional statements
+    if p.Current_Tok.matches(TT_KEY, "growl") {
+        return p.growl_expr()
+    }
 
-		// Check for assignment (e.g., int -> 10)
-		if p.Current_Tok.Type == TT_KEY && p.Current_Tok.matches(TT_KEY, "int") {
-			p.advance()
+    // Loops
+    if p.Current_Tok.matches(TT_KEY, "pounce") {
+        return p.pounce_expr()
+    }
 
-			if p.Current_Tok.Type != TT_EQ {
-				return res.failure(NewInvalidSyntaxError(
-					p.Current_Tok.Pos_Start, p.Current_Tok.Pos_End,
-					"Expected '->' after type",
-				).asString())
-			}
-			p.advance()
+    if p.Current_Tok.matches(TT_KEY, "leap") {
+        return p.leap_expr()
+    }
 
-			value_expr := res.register(p.expr())
-			if res.Error != "" {
-				return res
-			}
+    // Handle variable access and assignment
+    if p.Current_Tok.Type == TT_IDEN { // Variable name detected
+        var_name := p.Current_Tok
+        p.advance()
 
-			fmt.Printf("Assignment to variable %s\n", var_name.Value) // Added debug
-			return res.success(VarAssignNode{Var_Name_Tok: var_name, Value_Node: value_expr})
-		}
+        // Handle standard assignment (e.g., x -> 5)
+        if p.Current_Tok.matches(TT_EQ, "->") {
+            p.advance()
 
-		// If it is not an assignment, treat it as a variable access
-		fmt.Printf("Variable access for %s\n", var_name.Value) // Added debug
-		return res.success(VarAccessNode{Var_Name_Tok: var_name})
-	}
+            value_expr := res.register(p.expr()) // Get value expression (e.g., 5)
+            if res.Error != "" {
+                return res
+            }
 
-	// Handle binary operations and other expressions
-	return p.bin_op(p.term, []string{TT_PLUS, TT_MINUS, TT_GT, TT_LT, TT_GTE, TT_LTE, TT_EQEQ, TT_NEQ})
+            return res.success(VarAssignNode{Var_Name_Tok: var_name, Value_Node: value_expr})
+        }
+
+        // If it's not an assignment, treat it as variable access
+        return res.success(VarAccessNode{Var_Name_Tok: var_name})
+    }
+
+    // Handle binary operations and other expressions
+    return p.bin_op(p.term, []string{TT_PLUS, TT_MINUS, TT_GT, TT_LT, TT_GTE, TT_LTE, TT_EQEQ, TT_NEQ})
 }
+
+
+func (p *Parser) pounce_expr() *ParseResult {
+    res := &ParseResult{}
+
+    if !p.Current_Tok.matches(TT_KEY, "pounce") {
+        return res.failure("Expected 'pounce'")
+    }
+    p.advance()
+
+    // Ensure condition is an expression
+    condition := res.register(p.expr())
+    if res.Error != "" {
+        return res
+    }
+
+    // **Fix: Explicitly check for `{` after condition**
+    if p.Current_Tok.Type != TT_LCURLBR {
+        return res.failure(fmt.Sprintf("Expected '{' after pounce condition, got %s", p.Current_Tok.Type))
+    }
+    p.advance()
+
+    // Parse body inside `{}` block
+    body := []interface{}{}
+    for p.Current_Tok.Type != TT_RCURLBR && p.Current_Tok.Type != TT_EOF {
+        stmt := res.register(p.expr())
+        if res.Error != "" {
+            return res
+        }
+        body = append(body, stmt)
+    }
+
+    // Ensure closing `}`
+    if p.Current_Tok.Type != TT_RCURLBR {
+        return res.failure("Expected '}' at the end of pounce loop body")
+    }
+    p.advance()
+
+    return res.success(&PounceNode{
+        Condition: condition,
+        Body:      body,
+    })
+}
+
+
+
+
+
+func (p *Parser) leap_expr() *ParseResult {
+    res := &ParseResult{}
+
+    if !p.Current_Tok.matches(TT_KEY, "leap") {
+        return res.failure("Expected 'leap'")
+    }
+    p.advance()
+
+    // Expect a variable name (identifier)
+    if p.Current_Tok.Type != TT_IDEN {
+        return res.failure("Expected loop variable name after 'leap'")
+    }
+    varName := p.Current_Tok
+    p.advance()
+
+    // Expect 'from'
+    if p.Current_Tok.Value != "from" {
+        return res.failure("Expected 'from' after loop variable")
+    }
+    p.advance()
+
+    // Parse start expression
+    startExpr := res.register(p.expr())
+    if res.Error != "" {
+        return res
+    }
+
+    // Expect 'to'
+    if p.Current_Tok.Value != "to" {
+        return res.failure("Expected 'to' after start value")
+    }
+    p.advance()
+
+    // Parse end expression
+    endExpr := res.register(p.expr())
+    if res.Error != "" {
+        return res
+    }
+
+    // Expect '{'
+    if p.Current_Tok.Type != TT_LCURLBR {
+        return res.failure("Expected '{' before loop body")
+    }
+    p.advance()
+
+    // Parse loop body
+    body := res.register(p.expr())
+    if res.Error != "" {
+        return res
+    }
+
+    // Expect '}'
+    if p.Current_Tok.Type != TT_RCURLBR {
+        return res.failure("Expected '}' after loop body")
+    }
+    p.advance()
+
+    return res.success(LeapNode{
+        VarName:   varName,
+        StartExpr: startExpr,
+        EndExpr:   endExpr,
+        Body:      body,
+    })
+}
+
+
 
 // The bin_op function ensures the correct precedence for binary operations
 func (p *Parser) bin_op(funcToCall func() *ParseResult, ops []string) *ParseResult {
@@ -961,6 +1105,10 @@ func (i *Interpreter) visit(node interface{}, context *Context) *RTResult {
 		return i.visitVarAssignNode(node, context)
 	case GrowlNode:
         return i.visitGrowlNode(node, context)
+	case *PounceNode:
+        return i.visitPounceNode(*node, context)
+    case LeapNode:
+        return i.visitLeapNode(node, context)
 	default:
 		res := NewRTResult()
 		return res.failure(fmt.Errorf("No visit method for node type %T", node))
@@ -1019,16 +1167,18 @@ func (i *Interpreter) visitVarAccessNode(node VarAccessNode, context *Context) *
 }
 
 func (i *Interpreter) visitVarAssignNode(node VarAssignNode, context *Context) *RTResult {
-	res := NewRTResult()
-	varName := node.Var_Name_Tok.Value
-	value := res.register(i.visit(node.Value_Node, context))
-	if res.Error != nil {
-		return res
-	}
+    res := NewRTResult()
+    varName := node.Var_Name_Tok.Value
+    value := res.register(i.visit(node.Value_Node, context))
+    if res.Error != nil {
+        return res
+    }
 
-	context.Symbol_Table.set(varName, value)
-	return res.success(value)
+    fmt.Printf("Assigning %s -> %v\n", varName, value) // Debug output
+    context.Symbol_Table.set(varName, value)
+    return res.success(value)
 }
+
 
 // Updated functions to use RTResult
 
@@ -1174,6 +1324,80 @@ func (i *Interpreter) visitBoolNode(node BoolNode) *RTResult {
 	}
 	return res.success(false)
 }
+
+func (i *Interpreter) visitPounceNode(node PounceNode, context *Context) *RTResult {
+    res := NewRTResult()
+
+    for {
+        // Evaluate loop condition
+        condResult := res.register(i.visit(node.Condition, context))
+        if res.Error != nil {
+            return res
+        }
+
+        // Ensure condition is boolean
+        condBool, ok := condResult.(bool) // FIX: No pointer
+        if !ok {
+            return res.failure(fmt.Errorf("Pounce condition must be a boolean, got %T", condResult))
+        }
+
+        // Stop if condition is false
+        if !condBool {
+            break
+        }
+
+        // Execute loop body
+        for _, stmt := range node.Body {
+            res.register(i.visit(stmt, context))
+            if res.Error != nil {
+                return res
+            }
+        }
+    }
+
+    return res.success(nil)
+}
+
+
+
+
+
+
+func (i *Interpreter) visitLeapNode(node LeapNode, context *Context) *RTResult {
+    res := NewRTResult()
+
+    startResult := res.register(i.visit(node.StartExpr, context))
+    if res.Error != nil {
+        return res
+    }
+
+    endResult := res.register(i.visit(node.EndExpr, context))
+    if res.Error != nil {
+        return res
+    }
+
+    // Ensure start and end values are numbers
+    start, ok1 := startResult.(float64)
+    end, ok2 := endResult.(float64)
+
+    if !ok1 || !ok2 {
+        return res.failure(fmt.Errorf("Expected numbers in leap range, got %T and %T", startResult, endResult))
+    }
+
+    for iter := int(start); iter < int(end); iter++ {  // FIXED: Changed `i` to `iter`
+        context.Symbol_Table.set(node.VarName.Value, float64(iter))
+
+        res.register(i.visit(node.Body, context)) // FIXED: i.visit works now!
+        if res.Error != nil {
+            return res
+        }
+    }
+
+    return res.success(nil)
+}
+
+
+
 
 // RUN //
 
