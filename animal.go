@@ -856,18 +856,20 @@ func (p *Parser) expr() *ParseResult {
         if p.Current_Tok.Type == TT_EQ {
             p.advance()
 
-            value_expr := res.register(p.expr()) // Get value expression (e.g., 5)
+            // This is the important part - we need to handle binary operations
+            // in the value part of the assignment
+            value_expr := res.register(p.expr()) // Get value expression
             if res.Error != "" {
                 return res
             }
 
-            // Debug output
             fmt.Printf("Parsed assignment: %s -> %v\n", var_name.Value, value_expr)
-
             return res.success(VarAssignNode{Var_Name_Tok: var_name, Value_Node: value_expr})
         }
 
-        return res.success(VarAccessNode{Var_Name_Tok: var_name})
+        // If not an assignment, it's a variable access
+        p.Tok_Idx-- // Move back to the variable name
+        p.Current_Tok = p.Tokens[p.Tok_Idx]
     }
 
     // Handle binary operations and other expressions
@@ -882,20 +884,61 @@ func (p *Parser) pounce_expr() *ParseResult {
         return res.failure("Expected 'pounce'")
     }
     p.advance()
+    
+    // Debug
+    // fmt.Println("After 'pounce', token:", p.Current_Tok)
 
-    // Ensure condition is an expression
-    condition := res.register(p.expr())
+    // The condition is actually a comparison (binary operation)
+    // First get the left side (variable or value)
+    left := res.register(p.atom())
     if res.Error != "" {
         return res
     }
+    
+    // Debug
+    // fmt.Println("Left side parsed:", left)
+    // fmt.Println("Current token after left side:", p.Current_Tok)
 
-    // **Fix: Explicitly check for `{` after condition**
+    // Now expect a comparison operator
+    if !contains([]string{TT_GT, TT_LT, TT_GTE, TT_LTE, TT_EQEQ, TT_NEQ}, p.Current_Tok.Type) {
+        return res.failure(fmt.Sprintf("Expected comparison operator, got %s", p.Current_Tok.Type))
+    }
+    
+    // Save the operator
+    op_tok := p.Current_Tok
+    p.advance()
+    
+    // Debug
+    // fmt.Println("Operator parsed:", op_tok)
+    // fmt.Println("Current token after operator:", p.Current_Tok)
+
+    // Parse the right side of the comparison
+    right := res.register(p.atom())
+    if res.Error != "" {
+        return res
+    }
+    
+    // Debug
+    // fmt.Println("Right side parsed:", right)
+    // fmt.Println("Current token after right side:", p.Current_Tok)
+
+    // Build the condition as a binary operation
+    condition := BinOpNode{
+        Left_Node:  left,
+        Op_Tok:     op_tok,
+        Right_Node: right,
+    }
+
+    // Now expect the opening brace
     if p.Current_Tok.Type != TT_LCURLBR {
         return res.failure(fmt.Sprintf("Expected '{' after pounce condition, got %s", p.Current_Tok.Type))
     }
     p.advance()
+    
+    // Debug
+    // fmt.Println("Opening brace found, parsing body")
 
-    // Parse body inside `{}` block
+    // Parse body 
     body := []interface{}{}
     for p.Current_Tok.Type != TT_RCURLBR && p.Current_Tok.Type != TT_EOF {
         stmt := res.register(p.expr())
@@ -903,13 +946,19 @@ func (p *Parser) pounce_expr() *ParseResult {
             return res
         }
         body = append(body, stmt)
+        
+        // Debug
+        // fmt.Println("Added statement to body:", stmt)
     }
 
-    // Ensure closing `}`
+    // Check for closing brace
     if p.Current_Tok.Type != TT_RCURLBR {
-        return res.failure("Expected '}' at the end of pounce loop body")
+        return res.failure("Expected '}' at end of pounce body")
     }
     p.advance()
+
+    // Debug
+    // fmt.Println("Successfully parsed pounce loop")
 
     return res.success(&PounceNode{
         Condition: condition,
@@ -991,18 +1040,31 @@ func (p *Parser) leap_expr() *ParseResult {
 // The bin_op function ensures the correct precedence for binary operations
 func (p *Parser) bin_op(funcToCall func() *ParseResult, ops []string) *ParseResult {
     res := &ParseResult{}
+    
+    // Debug
+    // fmt.Println("bin_op called with ops:", ops)
+    // fmt.Println("Current token:", p.Current_Tok)
+    
     left := res.register(funcToCall())
     if res.Error != "" {
         return res
     }
+    
+    // fmt.Println("Left side parsed:", left)
+    // fmt.Println("Current token after left:", p.Current_Tok)
 
     for p.Current_Tok.Type != TT_EOF && contains(ops, p.Current_Tok.Type) {
+        fmt.Println("Found operator:", p.Current_Tok)
         op_tok := p.Current_Tok
         p.advance()
+        
+        fmt.Println("Current token after operator:", p.Current_Tok)
         right := res.register(funcToCall())
         if res.Error != "" {
             return res
         }
+        
+        fmt.Println("Right side parsed:", right)
         left = BinOpNode{Left_Node: left, Op_Tok: op_tok, Right_Node: right}
     }
 
@@ -1164,6 +1226,9 @@ func (i *Interpreter) visitVarAccessNode(node VarAccessNode, context *Context) *
 	res := NewRTResult()
 	varName := node.Var_Name_Tok.Value
 	value := context.Symbol_Table.get(varName)
+	// Debug
+	// fmt.Printf("Looking for variable: %s in context\n", varName)
+	// fmt.Printf("Available variables: %v\n", context.Symbol_Table.symbols)
 
 	if value == nil {
 		return res.failure(fmt.Errorf("'%s' is not defined", varName))
@@ -1403,42 +1468,39 @@ func (i *Interpreter) visitLeapNode(node LeapNode, context *Context) *RTResult {
     return res.success(nil)
 }
 
-
-
-
 // RUN //
-
 func run(text string, fn string) (interface{}, error) {
-	// Create a new global symbol table
-	globalSymbolTable := NewSymbolTable()
-
-	// Initialize the lexer and generate tokens
-	lexer := NewLexer(fn, text)
-	tokens, err := lexer.make_tokens()
-	if err != nil {
-		return nil, err
-	}
-
-	// Parse the tokens to generate the AST
-	parser := NewParser(tokens)
-	parseResult := parser.parse()
-
-	if parseResult.Error != "" {
-		return nil, fmt.Errorf(parseResult.Error)
-	}
-
-	// Create an interpreter and a context
-	interpreter := Interpreter{}
-	context := &Context{
-		DisplayName:  "<program>",
-		Symbol_Table: globalSymbolTable,
-	}
-
-	// Evaluate the AST
-	evalResult := interpreter.visit(parseResult.Node, context)
-	if evalResult.Error != nil {
-		return nil, evalResult.Error
-	}
-
-	return evalResult.Value, nil
+    // Create a new global symbol table
+    globalSymbolTable := NewSymbolTable()
+    
+    // Make the context
+    context := &Context{
+        DisplayName:  "<program>",
+        Symbol_Table: globalSymbolTable,
+    }
+    
+    // Initialize the lexer and generate tokens
+    lexer := NewLexer(fn, text)
+    tokens, err := lexer.make_tokens()
+    if err != nil {
+        return nil, err
+    }
+    
+    // Parse the tokens to generate the AST
+    parser := NewParser(tokens)
+    parseResult := parser.parse()
+    
+    if parseResult.Error != "" {
+        return nil, fmt.Errorf(parseResult.Error)
+    }
+    
+    // Create an interpreter with the SAME context
+    interpreter := Interpreter{}
+    result := interpreter.visit(parseResult.Node, context)
+    
+    if result.Error != nil {
+        return nil, result.Error
+    }
+    
+    return result.Value, nil
 }
