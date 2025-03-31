@@ -448,6 +448,7 @@ type IllegalCharError struct {
 	Error
 }
 
+// Test
 func NewIllegalCharError(posStart, posEnd *Position, details string) *IllegalCharError {
 	return &IllegalCharError{
 		Error: Error{
