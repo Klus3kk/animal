@@ -32,12 +32,13 @@ const (
 	TT_EXP      = "EXP"   //
 	TT_CONC     = "CONC"  //
 	TT_EQ       = "EQ"
-	TT_GT 		= "GT"
-	TT_LT 		= "LT"
-	TT_GTE 		= "GTE"
-	TT_LTE		= "LTE"
-	TT_EQEQ		= "EQEQ"
-	TT_NEQ		= "NEQ"
+	TT_GT       = "GT"
+	TT_LT       = "LT"
+	TT_GTE      = "GTE"
+	TT_LTE      = "LTE"
+	TT_EQEQ     = "EQEQ"
+	TT_NEQ      = "NEQ"
+	TT_COMMA    = "COMMA"
 	TT_LROUNDBR = "LROUNDBR" //
 	TT_RROUNDBR = "RROUNDBR" //
 	TT_RSQRBR   = "RSQRBR"   //
@@ -48,12 +49,12 @@ const (
 )
 
 var KEYWORDS = []string{
-    "int", "float", "bool", "string",
-    "growl", "sniff", "wag",  // if, elif, else
-    "roar",                   // print
-    "pounce", "leap",         // while, for
+	"int", "float", "bool", "string", // types
+	"growl", "sniff", "wag", // if, elif, else
+	"roar",           // print
+	"pounce", "leap", // while, for
+	"howl", // function
 }
-
 
 // Token represents a token with its type and value
 type Token struct {
@@ -242,11 +243,20 @@ func (l *Lexer) make_tokens() ([]Token, error) {
 			l.advance()
 			posEnd := l.Pos.copy()
 			tokens = append(tokens, Token{Type: TT_POS, Value: string(l.CurrentChar), Pos_Start: posStart, Pos_End: posEnd})
+		} else if l.CurrentChar == ',' {
+			posStart := l.Pos.copy()
+			l.advance()
+			tokens = append(tokens, Token{Type: TT_COMMA, Value: ",", Pos_Start: posStart, Pos_End: l.Pos.copy()})
 		} else if l.peek(4) == "roar" {
 			posStart := l.Pos.copy()
 			l.advanceBy(4)
 			posEnd := l.Pos.copy()
 			tokens = append(tokens, Token{Type: TT_KEY, Value: "roar", Pos_Start: posStart, Pos_End: posEnd})
+		} else if l.peek(4) == "howl" {
+			posStart := l.Pos.copy()
+			l.advanceBy(4)
+			posEnd := l.Pos.copy()
+			tokens = append(tokens, Token{Type: TT_KEY, Value: "howl", Pos_Start: posStart, Pos_End: posEnd})
 		} else {
 			// Handling illegal characters
 			posStart := l.Pos.copy()
@@ -345,44 +355,45 @@ func (l *Lexer) make_boolean() Token {
 	}
 	return Token{}
 }
+
 // GROWLNODE (if, else if, else)
 type GrowlNode struct {
-    Cases      []ConditionBlock // List of conditions and bodies
-    ElseCase   interface{}      // Optional else case
+	Cases    []ConditionBlock // List of conditions and bodies
+	ElseCase interface{}      // Optional else case
 }
 
 func (n GrowlNode) String() string {
 	return fmt.Sprintf("(GROWL %v ELSE %v)", n.Cases, n.ElseCase)
 }
+
 // WHILE/FOR LOOPS
 // Node for pounce (while) loops
 type PounceNode struct {
-    Condition interface{}
-    Body      []interface{}
+	Condition interface{}
+	Body      []interface{}
 }
 
 // Node for leap (for) loops
 type LeapNode struct {
-    VarName   Token
-    StartExpr interface{}
-    EndExpr   interface{}
-    Body      interface{}
+	VarName   Token
+	StartExpr interface{}
+	EndExpr   interface{}
+	Body      interface{}
 }
 
 // For one condition-body pair
 type ConditionBlock struct {
 	Condition interface{}
-	Body 	  interface{}
+	Body      interface{}
 }
-
 
 // ROARNODE (print)
 type RoarNode struct {
-    Value interface{}
+	Value interface{}
 }
 
 func (n RoarNode) String() string {
-    return fmt.Sprintf("(ROAR %v)", n.Value)
+	return fmt.Sprintf("(ROAR %v)", n.Value)
 }
 
 // RTRESULT
@@ -593,111 +604,180 @@ func (pr *ParseResult) failure(error string) *ParseResult {
 	return pr
 }
 
+func (p *Parser) howl_expr() *ParseResult {
+	res := &ParseResult{}
+
+	if !p.Current_Tok.matches(TT_KEY, "howl") {
+		return res.failure("Expected 'howl'")
+	}
+	p.advance()
+
+	if p.Current_Tok.Type != TT_IDEN {
+		return res.failure("Expected function name after 'howl'")
+	}
+	funcName := p.Current_Tok.Value
+	p.advance()
+
+	if p.Current_Tok.Type != TT_LROUNDBR {
+		return res.failure("Expected '(' after function name")
+	}
+	p.advance()
+
+	argNames := []string{}
+	for p.Current_Tok.Type == TT_IDEN {
+		argNames = append(argNames, p.Current_Tok.Value)
+		p.advance()
+		if p.Current_Tok.Type == TT_COMMA {
+			p.advance()
+		} else {
+			break
+		}
+	}
+
+	if p.Current_Tok.Type != TT_RROUNDBR {
+		return res.failure("Expected ')' after argument list")
+	}
+	p.advance()
+
+	if p.Current_Tok.Type != TT_LCURLBR {
+		return res.failure("Expected '{' before function body")
+	}
+	p.advance()
+
+	body := res.register(p.expr())
+	if res.Error != "" {
+		return res
+	}
+
+	if p.Current_Tok.Type != TT_RCURLBR {
+		return res.failure("Expected '}' after function body")
+	}
+	p.advance()
+
+	return res.success(FunctionDefNode{
+		Name:     funcName,
+		ArgNames: argNames,
+		Body:     body,
+	})
+}
+
 func (p *Parser) roar_expr() *ParseResult {
-    res := &ParseResult{}
+	res := &ParseResult{}
 
-    if !p.Current_Tok.matches(TT_KEY, "roar") {
-        return res.failure("Expected 'roar'")
-    }
-    p.advance()
+	if !p.Current_Tok.matches(TT_KEY, "roar") {
+		return res.failure("Expected 'roar'")
+	}
+	p.advance()
 
-	if p.Current_Tok.Type == TT_EOF || p.Current_Tok.Type == TT_KEY {
-        return res.success(RoarNode{Value: nil}) 
-    }
+	values := []interface{}{}
 
+	// If it's an empty roar like `roar`, just print newline
+	if p.Current_Tok.Type == TT_EOF || p.Current_Tok.Type == TT_KEY || p.Current_Tok.Type == TT_RCURLBR {
+		return res.success(RoarNode{Value: nil})
+	}
 
-    expr := res.register(p.expr())
-    if res.Error != "" {
-        return res
-    }
+	// Parse one or more comma-separated expressions
+	expr := res.register(p.expr())
+	if res.Error != "" {
+		return res
+	}
+	values = append(values, expr)
 
-    return res.success(RoarNode{Value: expr})
+	for p.Current_Tok.Type == TT_COMMA {
+		p.advance()
+
+		expr := res.register(p.expr())
+		if res.Error != "" {
+			return res
+		}
+		values = append(values, expr)
+	}
+
+	return res.success(RoarNode{Value: values})
 }
 
 func (p *Parser) growl_expr() *ParseResult {
-    res := &ParseResult{}
-    cases := []ConditionBlock{}
-    var elseCase interface{}
+	res := &ParseResult{}
+	cases := []ConditionBlock{}
+	var elseCase interface{}
 
-    // Handle "growl" (if)
-    if !p.Current_Tok.matches(TT_KEY, "growl") {
-        return res.failure("Expected 'growl'")
-    }
-    p.advance()
+	// Handle "growl" (if)
+	if !p.Current_Tok.matches(TT_KEY, "growl") {
+		return res.failure("Expected 'growl'")
+	}
+	p.advance()
 
-    condition := res.register(p.expr())
-    if res.Error != "" {
-        return res
-    }
+	condition := res.register(p.expr())
+	if res.Error != "" {
+		return res
+	}
 
-    if p.Current_Tok.Type != TT_LCURLBR { // Expecting '{'
-        return res.failure("Expected '{' after growl condition")
-    }
-    p.advance()
+	if p.Current_Tok.Type != TT_LCURLBR { // Expecting '{'
+		return res.failure("Expected '{' after growl condition")
+	}
+	p.advance()
 
-    body := res.register(p.expr())
-    if res.Error != "" {
-        return res
-    }
+	body := res.register(p.expr())
+	if res.Error != "" {
+		return res
+	}
 
-    if p.Current_Tok.Type != TT_RCURLBR { // Expecting '}'
-        return res.failure("Expected '}' after growl body")
-    }
-    p.advance()
+	if p.Current_Tok.Type != TT_RCURLBR { // Expecting '}'
+		return res.failure("Expected '}' after growl body")
+	}
+	p.advance()
 
-    cases = append(cases, ConditionBlock{Condition: condition, Body: body})
+	cases = append(cases, ConditionBlock{Condition: condition, Body: body})
 
-    // Handle "sniff" (else-if)
-    for p.Current_Tok.matches(TT_KEY, "sniff") {
-        p.advance()
+	// Handle "sniff" (else-if)
+	for p.Current_Tok.matches(TT_KEY, "sniff") {
+		p.advance()
 
-        condition := res.register(p.expr())
-        if res.Error != "" {
-            return res
-        }
+		condition := res.register(p.expr())
+		if res.Error != "" {
+			return res
+		}
 
-        if p.Current_Tok.Type != TT_LCURLBR {
-            return res.failure("Expected '{' after sniff condition")
-        }
-        p.advance()
+		if p.Current_Tok.Type != TT_LCURLBR {
+			return res.failure("Expected '{' after sniff condition")
+		}
+		p.advance()
 
-        body := res.register(p.expr())
-        if res.Error != "" {
-            return res
-        }
+		body := res.register(p.expr())
+		if res.Error != "" {
+			return res
+		}
 
-        if p.Current_Tok.Type != TT_RCURLBR {
-            return res.failure("Expected '}' after sniff body")
-        }
-        p.advance()
+		if p.Current_Tok.Type != TT_RCURLBR {
+			return res.failure("Expected '}' after sniff body")
+		}
+		p.advance()
 
-        cases = append(cases, ConditionBlock{Condition: condition, Body: body})
-    }
+		cases = append(cases, ConditionBlock{Condition: condition, Body: body})
+	}
 
-    // Handle "wag" (else)
-    if p.Current_Tok.matches(TT_KEY, "wag") {
-        p.advance()
+	// Handle "wag" (else)
+	if p.Current_Tok.matches(TT_KEY, "wag") {
+		p.advance()
 
-        if p.Current_Tok.Type != TT_LCURLBR {
-            return res.failure("Expected '{' after wag")
-        }
-        p.advance()
+		if p.Current_Tok.Type != TT_LCURLBR {
+			return res.failure("Expected '{' after wag")
+		}
+		p.advance()
 
-        elseCase = res.register(p.expr())
-        if res.Error != "" {
-            return res
-        }
+		elseCase = res.register(p.expr())
+		if res.Error != "" {
+			return res
+		}
 
-        if p.Current_Tok.Type != TT_RCURLBR {
-            return res.failure("Expected '}' after wag body")
-        }
-        p.advance()
-    }
+		if p.Current_Tok.Type != TT_RCURLBR {
+			return res.failure("Expected '}' after wag body")
+		}
+		p.advance()
+	}
 
-    return res.success(GrowlNode{Cases: cases, ElseCase: elseCase})
+	return res.success(GrowlNode{Cases: cases, ElseCase: elseCase})
 }
-
-
 
 // PARSER //
 
@@ -761,6 +841,40 @@ func (p *Parser) atom() *ParseResult {
 		return res.success(StringNode{Tok: tok})
 	} else if tok.Type == TT_IDEN {
 		p.advance()
+
+		// Check for function call: identifier followed by '('
+		if p.Current_Tok.Type == TT_LROUNDBR {
+			p.advance()
+
+			args := []interface{}{}
+			if p.Current_Tok.Type != TT_RROUNDBR {
+				for {
+					arg := res.register(p.expr())
+					if res.Error != "" {
+						return res
+					}
+					args = append(args, arg)
+
+					if p.Current_Tok.Type == TT_COMMA {
+						p.advance()
+					} else {
+						break
+					}
+				}
+			}
+
+			if p.Current_Tok.Type != TT_RROUNDBR {
+				return res.failure("Expected ')' after function arguments")
+			}
+			p.advance()
+
+			return res.success(FunctionCallNode{
+				FuncName: tok.Value,
+				Args:     args,
+			})
+		}
+
+		// Just variable access
 		return res.success(VarAccessNode{Var_Name_Tok: tok})
 	} else if tok.Type == TT_LROUNDBR {
 		p.advance()
@@ -780,26 +894,25 @@ func (p *Parser) atom() *ParseResult {
 		if expr.Error != "" {
 			return res.failure(expr.Error)
 		}
-		if p.Current_Tok.Type == TT_RSQRBR {
-			p.advance()
-			return res.success(expr.Node)
-		} else {
+		if p.Current_Tok.Type != TT_RSQRBR {
 			return res.failure("Expected ']'")
 		}
+		p.advance()
+		return res.success(expr.Node)
 	} else if tok.Type == TT_LCURLBR {
 		p.advance()
 		expr := p.expr()
 		if expr.Error != "" {
 			return res.failure(expr.Error)
 		}
-		if p.Current_Tok.Type == TT_RCURLBR {
-			p.advance()
-			return res.success(expr.Node)
-		} else {
+		if p.Current_Tok.Type != TT_RCURLBR {
 			return res.failure("Expected '}'")
 		}
+		p.advance()
+		return res.success(expr.Node)
 	}
-	return res.failure("Expected int, float, boolean, string, '+', '-', '(', '[', '{'")
+
+	return res.failure("Expected int, float, boolean, string, identifier, or bracketed expression")
 }
 
 // Unary operations: + and -
@@ -827,248 +940,244 @@ func (p *Parser) term() *ParseResult {
 
 // Modified expr function to handle variable assignments with types and operations
 func (p *Parser) expr() *ParseResult {
-    res := &ParseResult{}
+	res := &ParseResult{}
 
-    // Print statement
-    if p.Current_Tok.matches(TT_KEY, "roar") {
-        return p.roar_expr()
-    }
+	// Print statement
+	if p.Current_Tok.matches(TT_KEY, "roar") {
+		return p.roar_expr()
+	}
 
-    // Conditional statements
-    if p.Current_Tok.matches(TT_KEY, "growl") {
-        return p.growl_expr()
-    }
+	// Conditional statements
+	if p.Current_Tok.matches(TT_KEY, "growl") {
+		return p.growl_expr()
+	}
 
-    // Loops
-    if p.Current_Tok.matches(TT_KEY, "pounce") {
-        return p.pounce_expr()
-    }
+	// Loops
+	if p.Current_Tok.matches(TT_KEY, "pounce") {
+		return p.pounce_expr()
+	}
 
-    if p.Current_Tok.matches(TT_KEY, "leap") {
-        return p.leap_expr()
-    }
+	if p.Current_Tok.matches(TT_KEY, "leap") {
+		return p.leap_expr()
+	}
 
-    // Handle variable access and assignment
-    if p.Current_Tok.Type == TT_IDEN { // Variable name detected
-        var_name := p.Current_Tok
-        p.advance()
+	if p.Current_Tok.matches(TT_KEY, "howl") {
+		return p.howl_expr()
+	}
+	// Handle variable access and assignment
+	if p.Current_Tok.Type == TT_IDEN { // Variable name detected
+		var_name := p.Current_Tok
+		p.advance()
 
-        if p.Current_Tok.Type == TT_EQ {
-            p.advance()
+		if p.Current_Tok.Type == TT_EQ {
+			p.advance()
 
-            // This is the important part - we need to handle binary operations
-            // in the value part of the assignment
-            value_expr := res.register(p.expr()) // Get value expression
-            if res.Error != "" {
-                return res
-            }
+			// This is the important part - we need to handle binary operations
+			// in the value part of the assignment
+			value_expr := res.register(p.expr()) // Get value expression
+			if res.Error != "" {
+				return res
+			}
 
-            fmt.Printf("Parsed assignment: %s -> %v\n", var_name.Value, value_expr)
-            return res.success(VarAssignNode{Var_Name_Tok: var_name, Value_Node: value_expr})
-        }
+			fmt.Printf("Parsed assignment: %s -> %v\n", var_name.Value, value_expr)
+			return res.success(VarAssignNode{Var_Name_Tok: var_name, Value_Node: value_expr})
+		}
 
-        // If not an assignment, it's a variable access
-        p.Tok_Idx-- // Move back to the variable name
-        p.Current_Tok = p.Tokens[p.Tok_Idx]
-    }
+		// If not an assignment, it's a variable access
+		p.Tok_Idx-- // Move back to the variable name
+		p.Current_Tok = p.Tokens[p.Tok_Idx]
+	}
 
-    // Handle binary operations and other expressions
-    return p.bin_op(p.term, []string{TT_PLUS, TT_MINUS, TT_GT, TT_LT, TT_GTE, TT_LTE, TT_EQEQ, TT_NEQ})
+	// Handle binary operations and other expressions
+	return p.bin_op(p.term, []string{TT_PLUS, TT_MINUS, TT_GT, TT_LT, TT_GTE, TT_LTE, TT_EQEQ, TT_NEQ})
 }
-
 
 func (p *Parser) pounce_expr() *ParseResult {
-    res := &ParseResult{}
+	res := &ParseResult{}
 
-    if !p.Current_Tok.matches(TT_KEY, "pounce") {
-        return res.failure("Expected 'pounce'")
-    }
-    p.advance()
-    
-    // Debug
-    // fmt.Println("After 'pounce', token:", p.Current_Tok)
+	if !p.Current_Tok.matches(TT_KEY, "pounce") {
+		return res.failure("Expected 'pounce'")
+	}
+	p.advance()
 
-    // The condition is actually a comparison (binary operation)
-    // First get the left side (variable or value)
-    left := res.register(p.atom())
-    if res.Error != "" {
-        return res
-    }
-    
-    // Debug
-    // fmt.Println("Left side parsed:", left)
-    // fmt.Println("Current token after left side:", p.Current_Tok)
+	// Debug
+	// fmt.Println("After 'pounce', token:", p.Current_Tok)
 
-    // Now expect a comparison operator
-    if !contains([]string{TT_GT, TT_LT, TT_GTE, TT_LTE, TT_EQEQ, TT_NEQ}, p.Current_Tok.Type) {
-        return res.failure(fmt.Sprintf("Expected comparison operator, got %s", p.Current_Tok.Type))
-    }
-    
-    // Save the operator
-    op_tok := p.Current_Tok
-    p.advance()
-    
-    // Debug
-    // fmt.Println("Operator parsed:", op_tok)
-    // fmt.Println("Current token after operator:", p.Current_Tok)
+	// The condition is actually a comparison (binary operation)
+	// First get the left side (variable or value)
+	left := res.register(p.atom())
+	if res.Error != "" {
+		return res
+	}
 
-    // Parse the right side of the comparison
-    right := res.register(p.atom())
-    if res.Error != "" {
-        return res
-    }
-    
-    // Debug
-    // fmt.Println("Right side parsed:", right)
-    // fmt.Println("Current token after right side:", p.Current_Tok)
+	// Debug
+	// fmt.Println("Left side parsed:", left)
+	// fmt.Println("Current token after left side:", p.Current_Tok)
 
-    // Build the condition as a binary operation
-    condition := BinOpNode{
-        Left_Node:  left,
-        Op_Tok:     op_tok,
-        Right_Node: right,
-    }
+	// Now expect a comparison operator
+	if !contains([]string{TT_GT, TT_LT, TT_GTE, TT_LTE, TT_EQEQ, TT_NEQ}, p.Current_Tok.Type) {
+		return res.failure(fmt.Sprintf("Expected comparison operator, got %s", p.Current_Tok.Type))
+	}
 
-    // Now expect the opening brace
-    if p.Current_Tok.Type != TT_LCURLBR {
-        return res.failure(fmt.Sprintf("Expected '{' after pounce condition, got %s", p.Current_Tok.Type))
-    }
-    p.advance()
-    
-    // Debug
-    // fmt.Println("Opening brace found, parsing body")
+	// Save the operator
+	op_tok := p.Current_Tok
+	p.advance()
 
-    // Parse body 
-    body := []interface{}{}
-    for p.Current_Tok.Type != TT_RCURLBR && p.Current_Tok.Type != TT_EOF {
-        stmt := res.register(p.expr())
-        if res.Error != "" {
-            return res
-        }
-        body = append(body, stmt)
-        
-        // Debug
-        // fmt.Println("Added statement to body:", stmt)
-    }
+	// Debug
+	// fmt.Println("Operator parsed:", op_tok)
+	// fmt.Println("Current token after operator:", p.Current_Tok)
 
-    // Check for closing brace
-    if p.Current_Tok.Type != TT_RCURLBR {
-        return res.failure("Expected '}' at end of pounce body")
-    }
-    p.advance()
+	// Parse the right side of the comparison
+	right := res.register(p.atom())
+	if res.Error != "" {
+		return res
+	}
 
-    // Debug
-    // fmt.Println("Successfully parsed pounce loop")
+	// Debug
+	// fmt.Println("Right side parsed:", right)
+	// fmt.Println("Current token after right side:", p.Current_Tok)
 
-    return res.success(&PounceNode{
-        Condition: condition,
-        Body:      body,
-    })
+	// Build the condition as a binary operation
+	condition := BinOpNode{
+		Left_Node:  left,
+		Op_Tok:     op_tok,
+		Right_Node: right,
+	}
+
+	// Now expect the opening brace
+	if p.Current_Tok.Type != TT_LCURLBR {
+		return res.failure(fmt.Sprintf("Expected '{' after pounce condition, got %s", p.Current_Tok.Type))
+	}
+	p.advance()
+
+	// Debug
+	// fmt.Println("Opening brace found, parsing body")
+
+	// Parse body
+	body := []interface{}{}
+	for p.Current_Tok.Type != TT_RCURLBR && p.Current_Tok.Type != TT_EOF {
+		stmt := res.register(p.expr())
+		if res.Error != "" {
+			return res
+		}
+		body = append(body, stmt)
+
+		// Debug
+		// fmt.Println("Added statement to body:", stmt)
+	}
+
+	// Check for closing brace
+	if p.Current_Tok.Type != TT_RCURLBR {
+		return res.failure("Expected '}' at end of pounce body")
+	}
+	p.advance()
+
+	// Debug
+	// fmt.Println("Successfully parsed pounce loop")
+
+	return res.success(&PounceNode{
+		Condition: condition,
+		Body:      body,
+	})
 }
-
-
-
-
 
 func (p *Parser) leap_expr() *ParseResult {
-    res := &ParseResult{}
+	res := &ParseResult{}
 
-    if !p.Current_Tok.matches(TT_KEY, "leap") {
-        return res.failure("Expected 'leap'")
-    }
-    p.advance()
+	if !p.Current_Tok.matches(TT_KEY, "leap") {
+		return res.failure("Expected 'leap'")
+	}
+	p.advance()
 
-    // Expect a variable name (identifier)
-    if p.Current_Tok.Type != TT_IDEN {
-        return res.failure("Expected loop variable name after 'leap'")
-    }
-    varName := p.Current_Tok
-    p.advance()
+	// Expect a variable name (identifier)
+	if p.Current_Tok.Type != TT_IDEN {
+		return res.failure("Expected loop variable name after 'leap'")
+	}
+	varName := p.Current_Tok
+	p.advance()
 
-    // Expect 'from'
-    if p.Current_Tok.Value != "from" {
-        return res.failure("Expected 'from' after loop variable")
-    }
-    p.advance()
+	// Expect 'from'
+	if p.Current_Tok.Value != "from" {
+		return res.failure("Expected 'from' after loop variable")
+	}
+	p.advance()
 
-    // Parse start expression
-    startExpr := res.register(p.expr())
-    if res.Error != "" {
-        return res
-    }
+	// Parse start expression
+	startExpr := res.register(p.expr())
+	if res.Error != "" {
+		return res
+	}
 
-    // Expect 'to'
-    if p.Current_Tok.Value != "to" {
-        return res.failure("Expected 'to' after start value")
-    }
-    p.advance()
+	// Expect 'to'
+	if p.Current_Tok.Value != "to" {
+		return res.failure("Expected 'to' after start value")
+	}
+	p.advance()
 
-    // Parse end expression
-    endExpr := res.register(p.expr())
-    if res.Error != "" {
-        return res
-    }
+	// Parse end expression
+	endExpr := res.register(p.expr())
+	if res.Error != "" {
+		return res
+	}
 
-    // Expect '{'
-    if p.Current_Tok.Type != TT_LCURLBR {
-        return res.failure("Expected '{' before loop body")
-    }
-    p.advance()
+	// Expect '{'
+	if p.Current_Tok.Type != TT_LCURLBR {
+		return res.failure("Expected '{' before loop body")
+	}
+	p.advance()
 
-    // Parse loop body
-    body := res.register(p.expr())
-    if res.Error != "" {
-        return res
-    }
+	// Parse loop body
+	body := res.register(p.expr())
+	if res.Error != "" {
+		return res
+	}
 
-    // Expect '}'
-    if p.Current_Tok.Type != TT_RCURLBR {
-        return res.failure("Expected '}' after loop body")
-    }
-    p.advance()
+	// Expect '}'
+	if p.Current_Tok.Type != TT_RCURLBR {
+		return res.failure("Expected '}' after loop body")
+	}
+	p.advance()
 
-    return res.success(LeapNode{
-        VarName:   varName,
-        StartExpr: startExpr,
-        EndExpr:   endExpr,
-        Body:      body,
-    })
+	return res.success(LeapNode{
+		VarName:   varName,
+		StartExpr: startExpr,
+		EndExpr:   endExpr,
+		Body:      body,
+	})
 }
-
-
 
 // The bin_op function ensures the correct precedence for binary operations
 func (p *Parser) bin_op(funcToCall func() *ParseResult, ops []string) *ParseResult {
-    res := &ParseResult{}
-    
-    // Debug
-    // fmt.Println("bin_op called with ops:", ops)
-    // fmt.Println("Current token:", p.Current_Tok)
-    
-    left := res.register(funcToCall())
-    if res.Error != "" {
-        return res
-    }
-    
-    // fmt.Println("Left side parsed:", left)
-    // fmt.Println("Current token after left:", p.Current_Tok)
+	res := &ParseResult{}
 
-    for p.Current_Tok.Type != TT_EOF && contains(ops, p.Current_Tok.Type) {
-        fmt.Println("Found operator:", p.Current_Tok)
-        op_tok := p.Current_Tok
-        p.advance()
-        
-        fmt.Println("Current token after operator:", p.Current_Tok)
-        right := res.register(funcToCall())
-        if res.Error != "" {
-            return res
-        }
-        
-        fmt.Println("Right side parsed:", right)
-        left = BinOpNode{Left_Node: left, Op_Tok: op_tok, Right_Node: right}
-    }
+	// Debug
+	// fmt.Println("bin_op called with ops:", ops)
+	// fmt.Println("Current token:", p.Current_Tok)
 
-    return res.success(left)
+	left := res.register(funcToCall())
+	if res.Error != "" {
+		return res
+	}
+
+	// fmt.Println("Left side parsed:", left)
+	// fmt.Println("Current token after left:", p.Current_Tok)
+
+	for p.Current_Tok.Type != TT_EOF && contains(ops, p.Current_Tok.Type) {
+		fmt.Println("Found operator:", p.Current_Tok)
+		op_tok := p.Current_Tok
+		p.advance()
+
+		fmt.Println("Current token after operator:", p.Current_Tok)
+		right := res.register(funcToCall())
+		if res.Error != "" {
+			return res
+		}
+
+		fmt.Println("Right side parsed:", right)
+		left = BinOpNode{Left_Node: left, Op_Tok: op_tok, Right_Node: right}
+	}
+
+	return res.success(left)
 }
 
 // Utility function to check if a TokenType is in the list
@@ -1103,7 +1212,18 @@ func (c *Context) GenerateTraceback() string {
 	return "Traceback (most recent call last): \n" + result
 }
 
-// SYMBOL TABLE
+// FUNCTION NODES
+type FunctionDefNode struct {
+	Name     string
+	ArgNames []string
+	Body     interface{}
+}
+
+type FunctionCallNode struct {
+	FuncName string
+	Args     []interface{}
+}
+
 // SYMBOL TABLE
 type SymbolTable struct {
 	symbols map[string]interface{} // Dictionary to store symbols
@@ -1154,6 +1274,10 @@ type Interpreter struct{}
 
 func (i *Interpreter) visit(node interface{}, context *Context) *RTResult {
 	switch node := node.(type) {
+	case FunctionDefNode:
+		return i.visitFunctionDefNode(node, context)
+	case FunctionCallNode:
+		return i.visitFunctionCallNode(node, context)
 	case RoarNode:
 		return i.visitRoarNode(node, context)
 	case NumberNode:
@@ -1171,11 +1295,11 @@ func (i *Interpreter) visit(node interface{}, context *Context) *RTResult {
 	case VarAssignNode:
 		return i.visitVarAssignNode(node, context)
 	case GrowlNode:
-        return i.visitGrowlNode(node, context)
+		return i.visitGrowlNode(node, context)
 	case *PounceNode:
-        return i.visitPounceNode(*node, context)
-    case LeapNode:
-        return i.visitLeapNode(node, context)
+		return i.visitPounceNode(*node, context)
+	case LeapNode:
+		return i.visitLeapNode(node, context)
 	default:
 		res := NewRTResult()
 		return res.failure(fmt.Errorf("No visit method for node type %T", node))
@@ -1183,43 +1307,58 @@ func (i *Interpreter) visit(node interface{}, context *Context) *RTResult {
 }
 
 func (i *Interpreter) visitRoarNode(node RoarNode, context *Context) *RTResult {
-    res := NewRTResult()
+	res := NewRTResult()
 
+	// If empty roar, print newline
 	if node.Value == nil {
-        fmt.Println()
-        return res.success(nil)
-    }
-	
-    value := res.register(i.visit(node.Value, context))
-    if res.Error != nil {
-        return res
-    }
+		fmt.Println()
+		return res.success(nil)
+	}
 
-    fmt.Println(value) 
-    return res.success(nil)
+	values, ok := node.Value.([]interface{})
+	if !ok {
+		// Single value case (backward compatibility)
+		value := res.register(i.visit(node.Value, context))
+		if res.Error != nil {
+			return res
+		}
+		fmt.Println(value)
+		return res.success(nil)
+	}
+
+	outputs := []string{}
+	for _, expr := range values {
+		val := res.register(i.visit(expr, context))
+		if res.Error != nil {
+			return res
+		}
+		outputs = append(outputs, fmt.Sprint(val))
+	}
+
+	fmt.Println(strings.Join(outputs, " "))
+	return res.success(nil)
 }
 
 func (i *Interpreter) visitGrowlNode(node GrowlNode, context *Context) *RTResult {
-    res := NewRTResult()
+	res := NewRTResult()
 
-    for _, caseBlock := range node.Cases {
-        condition := res.register(i.visit(caseBlock.Condition, context))
-        if res.Error != nil {
-            return res
-        }
+	for _, caseBlock := range node.Cases {
+		condition := res.register(i.visit(caseBlock.Condition, context))
+		if res.Error != nil {
+			return res
+		}
 
-        if condition.(bool) {
-            return res.success(res.register(i.visit(caseBlock.Body, context)))
-        }
-    }
+		if condition.(bool) {
+			return res.success(res.register(i.visit(caseBlock.Body, context)))
+		}
+	}
 
-    if node.ElseCase != nil {
-        return res.success(res.register(i.visit(node.ElseCase, context)))
-    }
+	if node.ElseCase != nil {
+		return res.success(res.register(i.visit(node.ElseCase, context)))
+	}
 
-    return res.success(nil)
+	return res.success(nil)
 }
-
 
 // Visit methods
 func (i *Interpreter) visitVarAccessNode(node VarAccessNode, context *Context) *RTResult {
@@ -1237,23 +1376,66 @@ func (i *Interpreter) visitVarAccessNode(node VarAccessNode, context *Context) *
 }
 
 func (i *Interpreter) visitVarAssignNode(node VarAssignNode, context *Context) *RTResult {
-    res := NewRTResult()
-    varName := node.Var_Name_Tok.Value
-    value := res.register(i.visit(node.Value_Node, context))
-    if res.Error != nil {
-        return res
-    }
+	res := NewRTResult()
+	varName := node.Var_Name_Tok.Value
+	value := res.register(i.visit(node.Value_Node, context))
+	if res.Error != nil {
+		return res
+	}
 
-    fmt.Printf("Assigning variable: %s -> %v\n", varName, value) // Debug output
+	fmt.Printf("Assigning variable: %s -> %v\n", varName, value) // Debug output
 
-    context.Symbol_Table.set(varName, value)
-    return res.success(value)
+	context.Symbol_Table.set(varName, value)
+	return res.success(value)
 }
 
+// Using howl functions
+func (i *Interpreter) visitFunctionDefNode(node FunctionDefNode, context *Context) *RTResult {
+	res := NewRTResult()
+	context.Symbol_Table.set(node.Name, node)
+	return res.success(nil)
+}
 
+func (i *Interpreter) visitFunctionCallNode(node FunctionCallNode, context *Context) *RTResult {
+	res := NewRTResult()
+	fnVal := context.Symbol_Table.get(node.FuncName)
+	if fnVal == nil {
+		return res.failure(fmt.Errorf("Function '%s' is not defined", node.FuncName))
+	}
+
+	fnNode, ok := fnVal.(FunctionDefNode)
+	if !ok {
+		return res.failure(fmt.Errorf("'%s' is not a function", node.FuncName))
+	}
+
+	if len(fnNode.ArgNames) != len(node.Args) {
+		return res.failure(fmt.Errorf("Function '%s' expects %d arguments, got %d", node.FuncName, len(fnNode.ArgNames), len(node.Args)))
+	}
+
+	// New function context
+	funcContext := &Context{
+		DisplayName:  fnNode.Name,
+		Parent:       context,
+		Symbol_Table: NewSymbolTable(),
+	}
+	funcContext.Symbol_Table.parent = context.Symbol_Table
+
+	for idx := 0; idx < len(fnNode.ArgNames); idx++ {
+		argVal := res.register(i.visit(node.Args[idx], context))
+		if res.Error != nil {
+			return res
+		}
+		funcContext.Symbol_Table.set(fnNode.ArgNames[idx], argVal)
+	}
+
+	val := res.register(i.visit(fnNode.Body, funcContext))
+	if res.Error != nil {
+		return res
+	}
+	return res.success(val)
+}
 
 // Updated functions to use RTResult
-
 func (i *Interpreter) visitNumberNode(node NumberNode) *RTResult {
 	res := NewRTResult()
 
@@ -1275,88 +1457,87 @@ func (i *Interpreter) visitNumberNode(node NumberNode) *RTResult {
 }
 
 func (i *Interpreter) visitBinOpNode(node BinOpNode, context *Context) *RTResult {
-    res := NewRTResult()
+	res := NewRTResult()
 
-    // Evaluate the left and right nodes
-    leftResult := i.visit(node.Left_Node, context)
-    if leftResult.Error != nil {
-        return res.failure(leftResult.Error)
-    }
+	// Evaluate the left and right nodes
+	leftResult := i.visit(node.Left_Node, context)
+	if leftResult.Error != nil {
+		return res.failure(leftResult.Error)
+	}
 
-    rightResult := i.visit(node.Right_Node, context)
-    if rightResult.Error != nil {
-        return res.failure(rightResult.Error)
-    }
+	rightResult := i.visit(node.Right_Node, context)
+	if rightResult.Error != nil {
+		return res.failure(rightResult.Error)
+	}
 
-    leftValue := leftResult.Value
-    rightValue := rightResult.Value
+	leftValue := leftResult.Value
+	rightValue := rightResult.Value
 
-    switch node.Op_Tok.Type {
-    case TT_PLUS, TT_MINUS, TT_MUL, TT_DIV, TT_MOD, TT_EXP:
-        // Handle arithmetic operations
-        leftFloat, okLeft := leftValue.(float64)
-        rightFloat, okRight := rightValue.(float64)
-        if !okLeft || !okRight {
-            return res.failure(fmt.Errorf("Expected numbers for arithmetic operations"))
-        }
+	switch node.Op_Tok.Type {
+	case TT_PLUS, TT_MINUS, TT_MUL, TT_DIV, TT_MOD, TT_EXP:
+		// Handle arithmetic operations
+		leftFloat, okLeft := leftValue.(float64)
+		rightFloat, okRight := rightValue.(float64)
+		if !okLeft || !okRight {
+			return res.failure(fmt.Errorf("Expected numbers for arithmetic operations"))
+		}
 
-        switch node.Op_Tok.Type {
-        case TT_PLUS:
-            return res.success(leftFloat + rightFloat)
-        case TT_MINUS:
-            return res.success(leftFloat - rightFloat)
-        case TT_MUL:
-            return res.success(leftFloat * rightFloat)
-        case TT_DIV:
-            if rightFloat == 0 {
-                return res.failure(fmt.Errorf("Division by zero"))
-            }
-            return res.success(leftFloat / rightFloat)
-        case TT_MOD:
-            return res.success(math.Mod(leftFloat, rightFloat))
-        case TT_EXP:
-            return res.success(math.Pow(leftFloat, rightFloat))
-        }
+		switch node.Op_Tok.Type {
+		case TT_PLUS:
+			return res.success(leftFloat + rightFloat)
+		case TT_MINUS:
+			return res.success(leftFloat - rightFloat)
+		case TT_MUL:
+			return res.success(leftFloat * rightFloat)
+		case TT_DIV:
+			if rightFloat == 0 {
+				return res.failure(fmt.Errorf("Division by zero"))
+			}
+			return res.success(leftFloat / rightFloat)
+		case TT_MOD:
+			return res.success(math.Mod(leftFloat, rightFloat))
+		case TT_EXP:
+			return res.success(math.Pow(leftFloat, rightFloat))
+		}
 
-    case TT_CONC:
-        // Handle string concatenation
-        leftStr, okLeft := leftValue.(string)
-        rightStr, okRight := rightValue.(string)
-        if okLeft && okRight {
-            return res.success(leftStr + rightStr)
-        }
-        return res.failure(fmt.Errorf("Cannot concatenate non-string types"))
+	case TT_CONC:
+		// Handle string concatenation
+		leftStr, okLeft := leftValue.(string)
+		rightStr, okRight := rightValue.(string)
+		if okLeft && okRight {
+			return res.success(leftStr + rightStr)
+		}
+		return res.failure(fmt.Errorf("Cannot concatenate non-string types"))
 
-    // Comparison Operators
-    case TT_GT, TT_LT, TT_GTE, TT_LTE, TT_EQEQ, TT_NEQ:
-        leftFloat, okLeft := leftValue.(float64)
-        rightFloat, okRight := rightValue.(float64)
-        if !okLeft || !okRight {
-            return res.failure(fmt.Errorf("Expected numbers for comparison operations"))
-        }
+	// Comparison Operators
+	case TT_GT, TT_LT, TT_GTE, TT_LTE, TT_EQEQ, TT_NEQ:
+		leftFloat, okLeft := leftValue.(float64)
+		rightFloat, okRight := rightValue.(float64)
+		if !okLeft || !okRight {
+			return res.failure(fmt.Errorf("Expected numbers for comparison operations"))
+		}
 
-        switch node.Op_Tok.Type {
-        case TT_GT:
-            return res.success(leftFloat > rightFloat)
-        case TT_LT:
-            return res.success(leftFloat < rightFloat)
-        case TT_GTE:
-            return res.success(leftFloat >= rightFloat)
-        case TT_LTE:
-            return res.success(leftFloat <= rightFloat)
-        case TT_EQEQ:
-            return res.success(leftFloat == rightFloat)
-        case TT_NEQ:
-            return res.success(leftFloat != rightFloat)
-        }
+		switch node.Op_Tok.Type {
+		case TT_GT:
+			return res.success(leftFloat > rightFloat)
+		case TT_LT:
+			return res.success(leftFloat < rightFloat)
+		case TT_GTE:
+			return res.success(leftFloat >= rightFloat)
+		case TT_LTE:
+			return res.success(leftFloat <= rightFloat)
+		case TT_EQEQ:
+			return res.success(leftFloat == rightFloat)
+		case TT_NEQ:
+			return res.success(leftFloat != rightFloat)
+		}
 
-    default:
-        return res.failure(fmt.Errorf("Unknown operator: %s", node.Op_Tok.Value))
-    }
+	default:
+		return res.failure(fmt.Errorf("Unknown operator: %s", node.Op_Tok.Value))
+	}
 
-    return res.failure(fmt.Errorf("Unknown error"))
+	return res.failure(fmt.Errorf("Unknown error"))
 }
-
 
 func (i *Interpreter) visitUnaryOpNode(node UnaryOpNode, context *Context) *RTResult {
 	res := NewRTResult()
@@ -1398,109 +1579,104 @@ func (i *Interpreter) visitBoolNode(node BoolNode) *RTResult {
 }
 
 func (i *Interpreter) visitPounceNode(node PounceNode, context *Context) *RTResult {
-    res := NewRTResult()
+	res := NewRTResult()
 
-    for {
-        // Evaluate loop condition
-        condResult := res.register(i.visit(node.Condition, context))
-        if res.Error != nil {
-            return res
-        }
+	for {
+		// Evaluate loop condition
+		condResult := res.register(i.visit(node.Condition, context))
+		if res.Error != nil {
+			return res
+		}
 
-        // Ensure condition is boolean
-        condBool, ok := condResult.(bool) // FIX: No pointer
-        if !ok {
-            return res.failure(fmt.Errorf("Pounce condition must be a boolean, got %T", condResult))
-        }
+		// Ensure condition is boolean
+		condBool, ok := condResult.(bool) // FIX: No pointer
+		if !ok {
+			return res.failure(fmt.Errorf("Pounce condition must be a boolean, got %T", condResult))
+		}
 
-        // Stop if condition is false
-        if !condBool {
-            break
-        }
+		// Stop if condition is false
+		if !condBool {
+			break
+		}
 
-        // Execute loop body
-        for _, stmt := range node.Body {
-            res.register(i.visit(stmt, context))
-            if res.Error != nil {
-                return res
-            }
-        }
-    }
+		// Execute loop body
+		for _, stmt := range node.Body {
+			res.register(i.visit(stmt, context))
+			if res.Error != nil {
+				return res
+			}
+		}
+	}
 
-    return res.success(nil)
+	return res.success(nil)
 }
 
-
-
-
-
-
 func (i *Interpreter) visitLeapNode(node LeapNode, context *Context) *RTResult {
-    res := NewRTResult()
+	res := NewRTResult()
 
-    startResult := res.register(i.visit(node.StartExpr, context))
-    if res.Error != nil {
-        return res
-    }
+	startResult := res.register(i.visit(node.StartExpr, context))
+	if res.Error != nil {
+		return res
+	}
 
-    endResult := res.register(i.visit(node.EndExpr, context))
-    if res.Error != nil {
-        return res
-    }
+	endResult := res.register(i.visit(node.EndExpr, context))
+	if res.Error != nil {
+		return res
+	}
 
-    // Ensure start and end values are numbers
-    start, ok1 := startResult.(float64)
-    end, ok2 := endResult.(float64)
+	// Ensure start and end values are numbers
+	start, ok1 := startResult.(float64)
+	end, ok2 := endResult.(float64)
 
-    if !ok1 || !ok2 {
-        return res.failure(fmt.Errorf("Expected numbers in leap range, got %T and %T", startResult, endResult))
-    }
+	if !ok1 || !ok2 {
+		return res.failure(fmt.Errorf("Expected numbers in leap range, got %T and %T", startResult, endResult))
+	}
 
-    for iter := int(start); iter < int(end); iter++ {  // FIXED: Changed `i` to `iter`
-        context.Symbol_Table.set(node.VarName.Value, float64(iter))
+	for iter := int(start); iter < int(end); iter++ { // FIXED: Changed `i` to `iter`
+		context.Symbol_Table.set(node.VarName.Value, float64(iter))
 
-        res.register(i.visit(node.Body, context)) // FIXED: i.visit works now!
-        if res.Error != nil {
-            return res
-        }
-    }
+		res.register(i.visit(node.Body, context)) // FIXED: i.visit works now!
+		if res.Error != nil {
+			return res
+		}
+	}
 
-    return res.success(nil)
+	return res.success(nil)
 }
 
 // RUN //
 func run(text string, fn string) (interface{}, error) {
-    // Create a new global symbol table
-    globalSymbolTable := NewSymbolTable()
-    
-    // Make the context
-    context := &Context{
-        DisplayName:  "<program>",
-        Symbol_Table: globalSymbolTable,
-    }
-    
-    // Initialize the lexer and generate tokens
-    lexer := NewLexer(fn, text)
-    tokens, err := lexer.make_tokens()
-    if err != nil {
-        return nil, err
-    }
-    
-    // Parse the tokens to generate the AST
-    parser := NewParser(tokens)
-    parseResult := parser.parse()
-    
-    if parseResult.Error != "" {
-        return nil, fmt.Errorf(parseResult.Error)
-    }
-    
-    // Create an interpreter with the SAME context
-    interpreter := Interpreter{}
-    result := interpreter.visit(parseResult.Node, context)
-    
-    if result.Error != nil {
-        return nil, result.Error
-    }
-    
-    return result.Value, nil
+	// Create a new global symbol table
+	globalSymbolTable := NewSymbolTable()
+
+	// Make the context
+	context := &Context{
+		DisplayName:  "<program>",
+		Symbol_Table: globalSymbolTable,
+	}
+
+	// Initialize the lexer and generate tokens
+	lexer := NewLexer(fn, text)
+	tokens, err := lexer.make_tokens()
+	if err != nil {
+		return nil, err
+	}
+
+	// Parse the tokens to generate the AST
+	parser := NewParser(tokens)
+	parseResult := parser.parse()
+
+	if parseResult.Error != "" {
+		return nil, fmt.Errorf(parseResult.Error)
+	}
+
+	// Create an interpreter with the SAME context
+	interpreter := Interpreter{}
+	result := interpreter.visit(parseResult.Node, context)
+
+	if result.Error != nil {
+		return nil, result.Error
+	}
+
+	return result.Value, nil
 }
