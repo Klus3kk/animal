@@ -1,0 +1,5 @@
+howl greet(name) {
+    roar "Hello", name
+}
+
+greet("Bruce")

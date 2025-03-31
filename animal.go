@@ -117,7 +117,7 @@ func (l *Lexer) make_tokens() ([]Token, error) {
 	var err error
 
 	for l.CurrentChar != 0 { // while current character isn't None
-		if l.CurrentChar == ' ' || l.CurrentChar == '\t' {
+		if l.CurrentChar == ' ' || l.CurrentChar == '\t' || l.CurrentChar == '\r' || l.CurrentChar == '\n' {
 			l.advance()
 		} else if strings.IndexByte(DIGITS, l.CurrentChar) != -1 {
 			tokens = append(tokens, l.make_number()) // Tokenize number
@@ -258,13 +258,14 @@ func (l *Lexer) make_tokens() ([]Token, error) {
 			posEnd := l.Pos.copy()
 			tokens = append(tokens, Token{Type: TT_KEY, Value: "howl", Pos_Start: posStart, Pos_End: posEnd})
 		} else {
-			// Handling illegal characters
 			posStart := l.Pos.copy()
 			char := string(l.CurrentChar)
+			fmt.Printf("Invalid char encountered: [%q] Unicode: %U\n", char, l.CurrentChar)
 			l.advance()
-			err = fmt.Errorf("%s: Unexpected Character: '%s'", posStart.asString(), char)
+			err = fmt.Errorf("%s: Unexpected Character: %q", posStart.asString(), char)
 			break
 		}
+
 	}
 	tokens = append(tokens, Token{Type: TT_EOF, Value: "EOF", Pos_Start: l.Pos.copy(), Pos_End: l.Pos.copy()})
 	return tokens, err
@@ -806,17 +807,27 @@ func (p *Parser) advance() Token {
 }
 
 func (p *Parser) parse() *ParseResult {
-	res := p.expr()
-	if res.Error != "" {
-		return res
+	res := &ParseResult{}
+	statements := []interface{}{}
+
+	for p.Current_Tok.Type != TT_EOF {
+		stmt := res.register(p.expr())
+		if res.Error != "" {
+			return res
+		}
+		statements = append(statements, stmt)
 	}
-	if p.Current_Tok.Type != TT_EOF {
-		return res.failure(NewInvalidSyntaxError(
-			p.Current_Tok.Pos_Start, p.Current_Tok.Pos_End,
-			"Unexpected Token",
-		).asString())
-	}
-	return res
+
+	return res.success(StatementsNode{Statements: statements})
+}
+
+// Statement Node for multiple top-level expressions
+type StatementsNode struct {
+	Statements []interface{}
+}
+
+func (s StatementsNode) String() string {
+	return fmt.Sprintf("(%s)", s.Statements)
 }
 
 // HIERARCHY //
@@ -1301,10 +1312,23 @@ func (i *Interpreter) visit(node interface{}, context *Context) *RTResult {
 		return i.visitPounceNode(*node, context)
 	case LeapNode:
 		return i.visitLeapNode(node, context)
+	case StatementsNode:
+		return i.visitStatementsNode(node, context)
 	default:
 		res := NewRTResult()
 		return res.failure(fmt.Errorf("No visit method for node type %T", node))
 	}
+}
+
+func (i *Interpreter) visitStatementsNode(node StatementsNode, context *Context) *RTResult {
+	res := NewRTResult()
+	for _, stmt := range node.Statements {
+		res.register(i.visit(stmt, context))
+		if res.Error != nil {
+			return res
+		}
+	}
+	return res.success(nil)
 }
 
 func (i *Interpreter) visitRoarNode(node RoarNode, context *Context) *RTResult {

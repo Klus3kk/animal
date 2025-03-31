@@ -2,9 +2,9 @@ package main
 
 import (
 	"bufio"
+	"fmt"
 	"os"
 	"strings"
-	"fmt"
 )
 
 func debugParse(input string) {
@@ -26,59 +26,78 @@ func debugParse(input string) {
 }
 
 func customRun(text string, fn string, context *Context) (interface{}, error) {
-    // Initialize the lexer and generate tokens
-    lexer := NewLexer(fn, text)
-    tokens, err := lexer.make_tokens()
-    if err != nil {
-        return nil, err
-    }
+	// Initialize the lexer and generate tokens
+	lexer := NewLexer(fn, text)
+	tokens, err := lexer.make_tokens()
+	if err != nil {
+		return nil, err
+	}
 
-    // Parse the tokens to generate the AST
-    parser := NewParser(tokens)
-    parseResult := parser.parse()
+	// Parse the tokens to generate the AST
+	parser := NewParser(tokens)
+	parseResult := parser.parse()
 
-    if parseResult.Error != "" {
-        return nil, fmt.Errorf(parseResult.Error)
-    }
+	if parseResult.Error != "" {
+		return nil, fmt.Errorf(parseResult.Error)
+	}
 
-    // Create an interpreter and use the provided context
-    interpreter := Interpreter{}
-    result := interpreter.visit(parseResult.Node, context)
-    
-    if result.Error != nil {
-        return nil, result.Error
-    }
+	// Create an interpreter and use the provided context
+	interpreter := Interpreter{}
+	result := interpreter.visit(parseResult.Node, context)
 
-    return result.Value, nil
+	if result.Error != nil {
+		return nil, result.Error
+	}
+
+	return result.Value, nil
 }
 
 func main() {
-    reader := bufio.NewReader(os.Stdin)
-    
-    // Create a global symbol table to be used across all inputs
-    globalSymbolTable := NewSymbolTable()
-    context := &Context{
-        DisplayName:  "<program>",
-        Symbol_Table: globalSymbolTable,
-    }
-    
-    for {
-        fmt.Print(">> ")
-        input, _ := reader.ReadString('\n')
-        input = strings.TrimSpace(input)
-        inputLower := strings.ToLower(input)
+	args := os.Args[1:]
 
-        if inputLower == "exit" {
-            fmt.Println("Exiting...")
-            return
-        }
+	// Create a global symbol table to be used across inputs
+	globalSymbolTable := NewSymbolTable()
+	context := &Context{
+		DisplayName:  "<program>",
+		Symbol_Table: globalSymbolTable,
+	}
 
-        // Customize the run function to use the persistent context
-        result, err := customRun(input, "<stdin>", context)
-        if err != nil {
-            fmt.Println(err)
-        } else if result != nil {
-            fmt.Println(result)
-        }
-    }
+	// Run file mode: ./animal file.anml
+	if len(args) == 1 && strings.HasSuffix(args[0], ".anml") {
+		codeBytes, err := os.ReadFile(args[0])
+		if err != nil {
+			fmt.Println("Error reading file:", err)
+			return
+		}
+		code := string(codeBytes)
+		code = strings.TrimPrefix(code, "\uFEFF") // remove BOM if present
+
+		_, err = customRun(code, args[0], context)
+		if err != nil {
+			fmt.Println(err)
+		}
+		return
+	}
+
+	// Default: REPL mode
+	reader := bufio.NewReader(os.Stdin)
+
+	for {
+		fmt.Print(">> ")
+		input, _ := reader.ReadString('\n')
+		input = strings.TrimSpace(input)
+		inputLower := strings.ToLower(input)
+
+		if inputLower == "exit" {
+			fmt.Println("Exiting...")
+			return
+		}
+
+		result, err := customRun(input, "<stdin>", context)
+		if err != nil {
+			fmt.Println(err)
+		} else if result != nil {
+			fmt.Println(result)
+		}
+	}
 }
