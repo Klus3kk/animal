@@ -1,7 +1,13 @@
 # Animal
 
-The goal of this project is to create a new programming language with unique features and applications. The basic functions, operators etc. will be correlated to animals characteristics and sounds.
+The goal of this project is to create a new programming language with unique features and applications. The basic functions, operators etc. will be correlated to animals characteristics and sounds.  
 You can test the language by writing:
+
+```bash
+go build
+```
+
+And after that:
 
 ```bash
 ./animal
@@ -9,10 +15,12 @@ You can test the language by writing:
 
 ## Features
 
-* Defining the syntax and semantics of the language.
-* Implementing a compiler or interpreter.
-* Creating standard libraries.
-* Writing sample programs.
+* Arithmetic operations with animal sounds (e.g., `meow`, `woof`, `moo`)
+* Conditional statements (`growl`, `sniff`, `wag`)
+* Looping constructs (`leap`, `pounce`)
+* Printing output (`roar`)
+* Variable assignments (`x -> 5`)
+* Function definitions and calls (`howl`)
 
 ## Technologies
 
@@ -25,19 +33,31 @@ You can test the language by writing:
 
 **Operators:**
 
-* "*" - moo,
-* "+" - meow,
-* "-" - woof,
-* "/" - drone,
-* "%" - squeak,
-* "^" - soar.
+* `"*"` - moo
+* `"+"` - meow
+* `"-"` - woof
+* `"/"` - drone
+* `"%"` - squeak
+* `"^"` - soar
 
 **Brackets:**
 
-* () - round,
-* [] - square,
-* {} - curly.
+* `()` - round
+* `[]` - square
+* `{}` - curly
 
 **Functions:**
 
-* "roar" - print()
+* `"roar"` — print to console
+  ```animal
+  roar "Hello", 2 meow 3
+  ```
+
+* `"howl"` — define and call functions
+  ```animal
+  howl greet(name) {
+      roar "Hi", name
+  }
+
+  greet("Lucas")
+  ```
