@@ -1,10 +1,13 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"math"
+	"math/rand"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // CONSTANTS //
@@ -38,6 +41,7 @@ const (
 	TT_LTE      = "LTE"
 	TT_EQEQ     = "EQEQ"
 	TT_NEQ      = "NEQ"
+	TT_DOT      = "DOT"
 	TT_COMMA    = "COMMA"
 	TT_LROUNDBR = "LROUNDBR" //
 	TT_RROUNDBR = "RROUNDBR" //
@@ -182,6 +186,11 @@ func (l *Lexer) make_tokens() ([]Token, error) {
 			l.advance()
 			posEnd := l.Pos.copy()
 			tokens = append(tokens, Token{Type: TT_LROUNDBR, Value: string(l.CurrentChar), Pos_Start: posStart, Pos_End: posEnd})
+		} else if l.CurrentChar == '.' {
+			posStart := l.Pos.copy()
+			l.advance()
+			posEnd := l.Pos.copy()
+			tokens = append(tokens, Token{Type: TT_DOT, Value: ".", Pos_Start: posStart, Pos_End: posEnd})
 		} else if l.CurrentChar == ')' {
 			posStart := l.Pos.copy()
 			l.advance()
@@ -606,6 +615,55 @@ func (pr *ParseResult) failure(error string) *ParseResult {
 	return pr
 }
 
+func (p *Parser) parseDotCalls(base interface{}) *ParseResult {
+	res := &ParseResult{}
+	node := base
+
+	for p.Current_Tok.Type == TT_DOT {
+		p.advance()
+
+		if p.Current_Tok.Type != TT_IDEN {
+			return res.failure("Expected method name after '.'")
+		}
+		method := p.Current_Tok.Value
+		p.advance()
+
+		if p.Current_Tok.Type != TT_LROUNDBR {
+			return res.failure("Expected '(' after method name")
+		}
+		p.advance()
+
+		args := []interface{}{}
+		if p.Current_Tok.Type != TT_RROUNDBR {
+			for {
+				arg := res.register(p.expr())
+				if res.Error != "" {
+					return res
+				}
+				args = append(args, arg)
+				if p.Current_Tok.Type == TT_COMMA {
+					p.advance()
+				} else {
+					break
+				}
+			}
+		}
+
+		if p.Current_Tok.Type != TT_RROUNDBR {
+			return res.failure("Expected ')' after method arguments")
+		}
+		p.advance()
+
+		node = DotCallNode{
+			Target: node,
+			Method: method,
+			Args:   args,
+		}
+	}
+
+	return res.success(node)
+}
+
 func (p *Parser) howl_expr() *ParseResult {
 	res := &ParseResult{}
 
@@ -830,6 +888,11 @@ func (s StatementsNode) String() string {
 	return fmt.Sprintf("(%s)", s.Statements)
 }
 
+// ListNode
+type ListNode struct {
+	Elements []interface{}
+}
+
 // HIERARCHY //
 
 // Exponentiation, highest precedence
@@ -844,20 +907,19 @@ func (p *Parser) atom() *ParseResult {
 
 	if tok.Type == TT_INT || tok.Type == TT_FLOAT {
 		p.advance()
-		return res.success(NumberNode{Tok: tok})
+		return p.parseDotCalls(NumberNode{Tok: tok})
 	} else if tok.Type == TT_BOOL {
 		p.advance()
-		return res.success(BoolNode{Tok: tok})
+		return p.parseDotCalls(BoolNode{Tok: tok})
 	} else if tok.Type == TT_STRING {
 		p.advance()
-		return res.success(StringNode{Tok: tok})
+		return p.parseDotCalls(StringNode{Tok: tok})
 	} else if tok.Type == TT_IDEN {
 		p.advance()
 
-		// Check for function call: identifier followed by '('
+		// Function call
 		if p.Current_Tok.Type == TT_LROUNDBR {
 			p.advance()
-
 			args := []interface{}{}
 			if p.Current_Tok.Type != TT_RROUNDBR {
 				for {
@@ -866,7 +928,6 @@ func (p *Parser) atom() *ParseResult {
 						return res
 					}
 					args = append(args, arg)
-
 					if p.Current_Tok.Type == TT_COMMA {
 						p.advance()
 					} else {
@@ -874,54 +935,65 @@ func (p *Parser) atom() *ParseResult {
 					}
 				}
 			}
-
 			if p.Current_Tok.Type != TT_RROUNDBR {
 				return res.failure("Expected ')' after function arguments")
 			}
 			p.advance()
 
-			return res.success(FunctionCallNode{
+			node := FunctionCallNode{
 				FuncName: tok.Value,
 				Args:     args,
-			})
+			}
+			return p.parseDotCalls(node)
 		}
 
-		// Just variable access
-		return res.success(VarAccessNode{Var_Name_Tok: tok})
+		// Variable access
+		node := VarAccessNode{Var_Name_Tok: tok}
+		return p.parseDotCalls(node)
 	} else if tok.Type == TT_LROUNDBR {
 		p.advance()
-		expr := p.expr()
-		if expr.Error != "" {
-			return res.failure(expr.Error)
+		expr := res.register(p.expr())
+		if res.Error != "" {
+			return res
 		}
-		if p.Current_Tok.Type == TT_RROUNDBR {
-			p.advance()
-			return res.success(expr.Node)
-		} else {
-			return res.failure("Expected ')'")
+		if p.Current_Tok.Type != TT_RROUNDBR {
+			return res.failure("Expected ')' after expression")
 		}
+		p.advance()
+		return p.parseDotCalls(expr)
 	} else if tok.Type == TT_LSQRBR {
 		p.advance()
-		expr := p.expr()
-		if expr.Error != "" {
-			return res.failure(expr.Error)
+		elements := []interface{}{}
+		if p.Current_Tok.Type != TT_RSQRBR {
+			for {
+				elem := res.register(p.expr())
+				if res.Error != "" {
+					return res
+				}
+				elements = append(elements, elem)
+				if p.Current_Tok.Type == TT_COMMA {
+					p.advance()
+				} else {
+					break
+				}
+			}
 		}
 		if p.Current_Tok.Type != TT_RSQRBR {
-			return res.failure("Expected ']'")
+			return res.failure("Expected ']' after list")
 		}
 		p.advance()
-		return res.success(expr.Node)
+		return p.parseDotCalls(ListNode{Elements: elements})
 	} else if tok.Type == TT_LCURLBR {
 		p.advance()
-		expr := p.expr()
-		if expr.Error != "" {
-			return res.failure(expr.Error)
+		expr := res.register(p.expr())
+		if res.Error != "" {
+			return res
 		}
 		if p.Current_Tok.Type != TT_RCURLBR {
 			return res.failure("Expected '}'")
 		}
 		p.advance()
-		return res.success(expr.Node)
+		return p.parseDotCalls(expr)
 	}
 
 	return res.failure("Expected int, float, boolean, string, identifier, or bracketed expression")
@@ -1202,6 +1274,14 @@ func contains(ops []string, op string) bool {
 	return false
 }
 
+// DotCall
+
+type DotCallNode struct {
+	Target interface{}
+	Method string
+	Args   []interface{}
+}
+
 // CONTEXT //
 type Context struct {
 	DisplayName    string
@@ -1288,6 +1368,10 @@ func (i *Interpreter) visit(node interface{}, context *Context) *RTResult {
 	switch node := node.(type) {
 	case FunctionDefNode:
 		return i.visitFunctionDefNode(node, context)
+	case DotCallNode:
+		return i.visitDotCallNode(node, context)
+	case ListNode:
+		return i.visitListNode(node, context)
 	case FunctionCallNode:
 		return i.visitFunctionCallNode(node, context)
 	case RoarNode:
@@ -1318,6 +1402,135 @@ func (i *Interpreter) visit(node interface{}, context *Context) *RTResult {
 		res := NewRTResult()
 		return res.failure(fmt.Errorf("No visit method for node type %T", node))
 	}
+}
+
+func (i *Interpreter) visitListNode(node ListNode, context *Context) *RTResult {
+	res := NewRTResult()
+	evaluated := []interface{}{}
+	for _, el := range node.Elements {
+		val := res.register(i.visit(el, context))
+		if res.Error != nil {
+			return res
+		}
+		evaluated = append(evaluated, val)
+	}
+	return res.success(evaluated)
+}
+
+func (i *Interpreter) visitDotCallNode(node DotCallNode, context *Context) *RTResult {
+	var varName string
+	if nodeTarget, ok := node.Target.(VarAccessNode); ok {
+		varName = nodeTarget.Var_Name_Tok.Value
+	}
+
+	res := NewRTResult()
+
+	list := res.register(i.visit(node.Target, context))
+	if res.Error != nil {
+		return res
+	}
+
+	listVal, ok := list.([]interface{})
+	if !ok {
+		return res.failure(errors.New("Can only call methods on lists"))
+	}
+
+	method := node.Method
+
+	switch method {
+	case "sniff": // append
+		val := res.register(i.visit(node.Args[0], context))
+		if res.Error != nil {
+			return res
+		}
+		listVal = append(listVal, val)
+
+	case "howl": // remove by index
+		idxRaw := res.register(i.visit(node.Args[0], context))
+		if res.Error != nil {
+			return res
+		}
+		idx, ok := idxRaw.(float64)
+		if !ok {
+			return res.failure(fmt.Errorf("Expected index to be a number"))
+		}
+		i := int(idx)
+		if i >= 0 && i < len(listVal) {
+			listVal = append(listVal[:i], listVal[i+1:]...)
+		}
+
+	case "wag":
+		return res.success(float64(len(listVal)))
+
+	case "prowl":
+		r := rand.New(rand.NewSource(time.Now().UnixNano()))
+		r.Shuffle(len(listVal), func(i, j int) {
+			listVal[i], listVal[j] = listVal[j], listVal[i]
+		})
+
+	case "snarl":
+		for i := 0; i < len(listVal)/2; i++ {
+			listVal[i], listVal[len(listVal)-1-i] = listVal[len(listVal)-1-i], listVal[i]
+		}
+
+	case "lick":
+		flat := []interface{}{}
+		for _, v := range listVal {
+			if nested, ok := v.([]interface{}); ok {
+				flat = append(flat, nested...)
+			} else {
+				flat = append(flat, v)
+			}
+		}
+		return res.success(flat)
+
+	case "howl_at":
+		thresholdRaw := res.register(i.visit(node.Args[0], context))
+		if res.Error != nil {
+			return res
+		}
+		threshold, ok := thresholdRaw.(float64)
+		if !ok {
+			return res.failure(fmt.Errorf("Expected threshold to be a number"))
+		}
+		filtered := []interface{}{}
+		for _, v := range listVal {
+			if val, ok := v.(float64); ok && val > threshold {
+				filtered = append(filtered, val)
+			}
+		}
+		return res.success(filtered)
+
+	case "nest":
+		sizeRaw := res.register(i.visit(node.Args[0], context))
+		if res.Error != nil {
+			return res
+		}
+		size, ok := sizeRaw.(float64)
+		if !ok {
+			return res.failure(fmt.Errorf("Expected chunk size to be a number"))
+		}
+		chunks := []interface{}{}
+		sz := int(size)
+		for i := 0; i < len(listVal); i += sz {
+			end := i + sz
+			if end > len(listVal) {
+				end = len(listVal)
+			}
+			chunks = append(chunks, listVal[i:end])
+		}
+		return res.success(chunks)
+
+	default:
+		return res.failure(errors.New("Unknown list method: " + method))
+	}
+
+	// Save back the updated list if it was mutated
+	if varName != "" {
+		context.Symbol_Table.set(varName, listVal)
+	}
+
+	return res.success(nil)
 }
 
 func (i *Interpreter) visitStatementsNode(node StatementsNode, context *Context) *RTResult {
