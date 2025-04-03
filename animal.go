@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"math"
 	"math/rand"
@@ -58,6 +57,7 @@ var KEYWORDS = []string{
 	"roar",           // print
 	"pounce", "leap", // while, for
 	"howl", // function
+	"nest", // data structure
 }
 
 // Token represents a token with its type and value
@@ -626,47 +626,105 @@ func (p *Parser) parseDotCalls(base interface{}) *ParseResult {
 		p.advance()
 
 		if p.Current_Tok.Type != TT_IDEN && p.Current_Tok.Type != TT_KEY {
-			return res.failure("Expected method name after '.'")
+			return res.failure("Expected property or method name after '.'")
 		}
 
 		method := p.Current_Tok.Value
 		p.Current_Tok.Type = TT_IDEN
 		p.advance()
 
-		if p.Current_Tok.Type != TT_LROUNDBR {
-			return res.failure("Expected '(' after method name")
-		}
-		p.advance()
+		// 👇 Check if it's a method call (with parentheses)
+		if p.Current_Tok.Type == TT_LROUNDBR {
+			p.advance()
 
-		args := []interface{}{}
-		if p.Current_Tok.Type != TT_RROUNDBR {
-			for {
-				arg := res.register(p.expr())
-				if res.Error != "" {
-					return res
-				}
-				args = append(args, arg)
-				if p.Current_Tok.Type == TT_COMMA {
-					p.advance()
-				} else {
-					break
+			args := []interface{}{}
+			if p.Current_Tok.Type != TT_RROUNDBR {
+				for {
+					arg := res.register(p.expr())
+					if res.Error != "" {
+						return res
+					}
+					args = append(args, arg)
+					if p.Current_Tok.Type == TT_COMMA {
+						p.advance()
+					} else {
+						break
+					}
 				}
 			}
-		}
 
-		if p.Current_Tok.Type != TT_RROUNDBR {
-			return res.failure("Expected ')' after method arguments")
-		}
-		p.advance()
+			if p.Current_Tok.Type != TT_RROUNDBR {
+				return res.failure("Expected ')' after method arguments")
+			}
+			p.advance()
 
-		node = DotCallNode{
-			Target: node,
-			Method: method,
-			Args:   args,
+			node = DotCallNode{
+				Target: node,
+				Method: method,
+				Args:   args, // method call
+			}
+		} else {
+			node = DotCallNode{
+				Target: node,
+				Method: method,
+				Args:   nil, // property get or set
+			}
 		}
 	}
 
 	return res.success(node)
+}
+
+func (p *Parser) nest_expr() *ParseResult {
+	res := &ParseResult{}
+
+	if !p.Current_Tok.matches(TT_KEY, "nest") {
+		return res.failure("Expected 'nest'")
+	}
+	p.advance()
+
+	if p.Current_Tok.Type != TT_IDEN {
+		return res.failure("Expected name after 'nest'")
+	}
+	nestName := p.Current_Tok.Value
+	p.advance()
+
+	if p.Current_Tok.Type != TT_LCURLBR {
+		return res.failure("Expected '{' after nest name")
+	}
+	p.advance()
+
+	fields := []string{}
+	methods := map[string]*FunctionDefNode{}
+
+	for p.Current_Tok.Type != TT_RCURLBR && p.Current_Tok.Type != TT_EOF {
+		if p.Current_Tok.matches(TT_KEY, "howl") {
+			fn := res.register(p.howl_expr())
+			if res.Error != "" {
+				return res
+			}
+			funcNode := fn.(FunctionDefNode)
+			methods[funcNode.Name] = &funcNode
+		} else if p.Current_Tok.Type == TT_IDEN {
+			fields = append(fields, p.Current_Tok.Value)
+			p.advance()
+		} else {
+			return res.failure("Expected property or method in nest body")
+		}
+	}
+
+	if p.Current_Tok.Type != TT_RCURLBR {
+		return res.failure("Expected '}' to close nest block")
+	}
+	p.advance()
+
+	return res.success(NestDefNode{
+		Name:     nestName,
+		Fields:   fields,
+		Methods:  methods,
+		PosStart: nil,
+		PosEnd:   nil,
+	})
 }
 
 func (p *Parser) howl_expr() *ParseResult {
@@ -1053,6 +1111,11 @@ func (p *Parser) expr() *ParseResult {
 	if p.Current_Tok.matches(TT_KEY, "howl") {
 		return p.howl_expr()
 	}
+
+	if p.Current_Tok.matches(TT_KEY, "nest") {
+		return p.nest_expr()
+	}
+
 	// Handle variable access and assignment
 	if p.Current_Tok.Type == TT_IDEN { // Variable name detected
 		var_name := p.Current_Tok
@@ -1321,6 +1384,15 @@ type FunctionCallNode struct {
 	Args     []interface{}
 }
 
+// NEST NODES - CUSTOM DATA STRUCTURE
+type NestDefNode struct {
+	Name     string
+	Fields   []string
+	Methods  map[string]*FunctionDefNode
+	PosStart *Position
+	PosEnd   *Position
+}
+
 // SYMBOL TABLE
 type SymbolTable struct {
 	symbols map[string]interface{} // Dictionary to store symbols
@@ -1375,6 +1447,8 @@ func (i *Interpreter) visit(node interface{}, context *Context) *RTResult {
 		return i.visitFunctionDefNode(node, context)
 	case DotCallNode:
 		return i.visitDotCallNode(node, context)
+	case NestDefNode:
+		return i.visitNestDefNode(node, context)
 	case ListNode:
 		return i.visitListNode(node, context)
 	case FunctionCallNode:
@@ -1422,120 +1496,173 @@ func (i *Interpreter) visitListNode(node ListNode, context *Context) *RTResult {
 	return res.success(evaluated)
 }
 
+func (i *Interpreter) visitNestDefNode(node NestDefNode, context *Context) *RTResult {
+	res := NewRTResult()
+	context.Symbol_Table.set(node.Name, node)
+	return res.success(nil)
+}
+
 func (i *Interpreter) visitDotCallNode(node DotCallNode, context *Context) *RTResult {
+	res := NewRTResult()
 	var varName string
+
 	if nodeTarget, ok := node.Target.(VarAccessNode); ok {
 		varName = nodeTarget.Var_Name_Tok.Value
 	}
 
-	res := NewRTResult()
-
-	list := res.register(i.visit(node.Target, context))
+	targetVal := res.register(i.visit(node.Target, context))
 	if res.Error != nil {
 		return res
 	}
 
-	listVal, ok := list.([]interface{})
-	if !ok {
-		return res.failure(errors.New("Can only call methods on lists"))
+	// 🐾 LIST METHODS
+	if listVal, ok := targetVal.([]interface{}); ok {
+		switch node.Method {
+		case "sniff":
+			val := res.register(i.visit(node.Args[0], context))
+			if res.Error != nil {
+				return res
+			}
+			listVal = append(listVal, val)
+
+		case "howl":
+			idxRaw := res.register(i.visit(node.Args[0], context))
+			if res.Error != nil {
+				return res
+			}
+			idxFloat, ok := idxRaw.(float64)
+			if !ok {
+				return res.failure(fmt.Errorf("Expected index to be a number"))
+			}
+			idx := int(idxFloat)
+			if idx >= 0 && idx < len(listVal) {
+				listVal = append(listVal[:idx], listVal[idx+1:]...)
+			}
+
+		case "wag":
+			return res.success(float64(len(listVal)))
+
+		case "prowl":
+			r := rand.New(rand.NewSource(time.Now().UnixNano()))
+			r.Shuffle(len(listVal), func(i, j int) {
+				listVal[i], listVal[j] = listVal[j], listVal[i]
+			})
+
+		case "snarl":
+			for i := 0; i < len(listVal)/2; i++ {
+				listVal[i], listVal[len(listVal)-1-i] = listVal[len(listVal)-1-i], listVal[i]
+			}
+
+		case "lick":
+			flat := []interface{}{}
+			for _, v := range listVal {
+				if nested, ok := v.([]interface{}); ok {
+					flat = append(flat, nested...)
+				} else {
+					flat = append(flat, v)
+				}
+			}
+			return res.success(flat)
+
+		case "howl_at":
+			thresholdRaw := res.register(i.visit(node.Args[0], context))
+			if res.Error != nil {
+				return res
+			}
+			threshold, ok := thresholdRaw.(float64)
+			if !ok {
+				return res.failure(fmt.Errorf("Expected threshold to be a number"))
+			}
+			filtered := []interface{}{}
+			for _, v := range listVal {
+				if val, ok := v.(float64); ok && val > threshold {
+					filtered = append(filtered, val)
+				}
+			}
+			return res.success(filtered)
+
+		case "nest":
+			sizeRaw := res.register(i.visit(node.Args[0], context))
+			if res.Error != nil {
+				return res
+			}
+			size, ok := sizeRaw.(float64)
+			if !ok {
+				return res.failure(fmt.Errorf("Expected chunk size to be a number"))
+			}
+			chunks := []interface{}{}
+			sz := int(size)
+			for i := 0; i < len(listVal); i += sz {
+				end := i + sz
+				if end > len(listVal) {
+					end = len(listVal)
+				}
+				chunks = append(chunks, listVal[i:end])
+			}
+			return res.success(chunks)
+
+		default:
+			return res.failure(fmt.Errorf("Unknown list method: %s", node.Method))
+		}
+
+		if varName != "" {
+			context.Symbol_Table.set(varName, listVal)
+		}
+		return res.success(nil)
 	}
 
-	method := node.Method
+	// 🐚 NEST METHODS & FIELDS
+	if inst, ok := targetVal.(map[string]interface{}); ok {
+		// METHOD CALL: d.speak()
+		if methods, ok := inst["__methods__"].(map[string]*FunctionDefNode); ok {
+			if fn, ok := methods[node.Method]; ok {
+				if len(fn.ArgNames) != len(node.Args) {
+					return res.failure(fmt.Errorf("Method '%s' expects %d args, got %d", node.Method, len(fn.ArgNames), len(node.Args)))
+				}
 
-	switch method {
-	case "sniff": // append
-		val := res.register(i.visit(node.Args[0], context))
-		if res.Error != nil {
-			return res
-		}
-		listVal = append(listVal, val)
+				methodCtx := &Context{
+					DisplayName:  fn.Name,
+					Parent:       context,
+					Symbol_Table: NewSymbolTable(),
+				}
+				methodCtx.Symbol_Table.parent = context.Symbol_Table
+				methodCtx.Symbol_Table.set("this", inst)
 
-	case "howl": // remove by index
-		idxRaw := res.register(i.visit(node.Args[0], context))
-		if res.Error != nil {
-			return res
-		}
-		idx, ok := idxRaw.(float64)
-		if !ok {
-			return res.failure(fmt.Errorf("Expected index to be a number"))
-		}
-		i := int(idx)
-		if i >= 0 && i < len(listVal) {
-			listVal = append(listVal[:i], listVal[i+1:]...)
-		}
+				for idx := 0; idx < len(fn.ArgNames); idx++ {
+					argVal := res.register(i.visit(node.Args[idx], context))
+					if res.Error != nil {
+						return res
+					}
+					methodCtx.Symbol_Table.set(fn.ArgNames[idx], argVal)
+				}
 
-	case "wag":
-		return res.success(float64(len(listVal)))
-
-	case "prowl":
-		r := rand.New(rand.NewSource(time.Now().UnixNano()))
-		r.Shuffle(len(listVal), func(i, j int) {
-			listVal[i], listVal[j] = listVal[j], listVal[i]
-		})
-
-	case "snarl":
-		for i := 0; i < len(listVal)/2; i++ {
-			listVal[i], listVal[len(listVal)-1-i] = listVal[len(listVal)-1-i], listVal[i]
-		}
-
-	case "lick":
-		flat := []interface{}{}
-		for _, v := range listVal {
-			if nested, ok := v.([]interface{}); ok {
-				flat = append(flat, nested...)
-			} else {
-				flat = append(flat, v)
+				val := res.register(i.visit(fn.Body, methodCtx))
+				if res.Error != nil {
+					return res
+				}
+				return res.success(val)
 			}
 		}
-		return res.success(flat)
 
-	case "howl_at":
-		thresholdRaw := res.register(i.visit(node.Args[0], context))
-		if res.Error != nil {
-			return res
-		}
-		threshold, ok := thresholdRaw.(float64)
-		if !ok {
-			return res.failure(fmt.Errorf("Expected threshold to be a number"))
-		}
-		filtered := []interface{}{}
-		for _, v := range listVal {
-			if val, ok := v.(float64); ok && val > threshold {
-				filtered = append(filtered, val)
+		// PROPERTY SET: d.name -> "Buddy"
+		if len(node.Args) == 1 {
+			val := res.register(i.visit(node.Args[0], context))
+			if res.Error != nil {
+				return res
 			}
+			inst[node.Method] = val
+			return res.success(val)
 		}
-		return res.success(filtered)
 
-	case "nest":
-		sizeRaw := res.register(i.visit(node.Args[0], context))
-		if res.Error != nil {
-			return res
+		// PROPERTY GET: roar d.name
+		if val, exists := inst[node.Method]; exists {
+			return res.success(val)
 		}
-		size, ok := sizeRaw.(float64)
-		if !ok {
-			return res.failure(fmt.Errorf("Expected chunk size to be a number"))
-		}
-		chunks := []interface{}{}
-		sz := int(size)
-		for i := 0; i < len(listVal); i += sz {
-			end := i + sz
-			if end > len(listVal) {
-				end = len(listVal)
-			}
-			chunks = append(chunks, listVal[i:end])
-		}
-		return res.success(chunks)
 
-	default:
-		return res.failure(errors.New("Unknown list method: " + method))
+		return res.failure(fmt.Errorf("Unknown property or method '%s'", node.Method))
 	}
 
-	// Save back the updated list if it was mutated
-	if varName != "" {
-		context.Symbol_Table.set(varName, listVal)
-	}
-
-	return res.success(nil)
+	return res.failure(fmt.Errorf("Only lists or nest instances support dot-access"))
 }
 
 func (i *Interpreter) visitStatementsNode(node StatementsNode, context *Context) *RTResult {
@@ -1641,21 +1768,38 @@ func (i *Interpreter) visitFunctionDefNode(node FunctionDefNode, context *Contex
 
 func (i *Interpreter) visitFunctionCallNode(node FunctionCallNode, context *Context) *RTResult {
 	res := NewRTResult()
+
 	fnVal := context.Symbol_Table.get(node.FuncName)
 	if fnVal == nil {
-		return res.failure(fmt.Errorf("Function '%s' is not defined", node.FuncName))
+		return res.failure(fmt.Errorf("Function or nest '%s' is not defined", node.FuncName))
 	}
 
+	// 🐚 If it's a nest, instantiate it
+	if nestDef, isNest := fnVal.(NestDefNode); isNest {
+		instance := map[string]interface{}{}
+
+		// Initialize all fields to nil
+		for _, field := range nestDef.Fields {
+			instance[field] = nil
+		}
+
+		// Attach method map and __type__
+		instance["__methods__"] = nestDef.Methods
+		instance["__type__"] = nestDef.Name
+
+		return res.success(instance)
+	}
+
+	// 🐾 Otherwise, it's a normal function
 	fnNode, ok := fnVal.(FunctionDefNode)
 	if !ok {
-		return res.failure(fmt.Errorf("'%s' is not a function", node.FuncName))
+		return res.failure(fmt.Errorf("'%s' is not a function or nest", node.FuncName))
 	}
 
 	if len(fnNode.ArgNames) != len(node.Args) {
 		return res.failure(fmt.Errorf("Function '%s' expects %d arguments, got %d", node.FuncName, len(fnNode.ArgNames), len(node.Args)))
 	}
 
-	// New function context
 	funcContext := &Context{
 		DisplayName:  fnNode.Name,
 		Parent:       context,
