@@ -296,10 +296,13 @@ func (l *Lexer) make_identifier() Token {
 	}
 	tok_Type := TT_IDEN
 
-	for _, keyword := range KEYWORDS {
-		if idStr == keyword {
-			tok_Type = TT_KEY
-			break
+	// Check if identifier is a keyword only if not immediately after '.'
+	if !(l.Pos.Idx > 0 && l.Text[l.Pos.Idx-1] == '.') {
+		for _, keyword := range KEYWORDS {
+			if idStr == keyword {
+				tok_Type = TT_KEY
+				break
+			}
 		}
 	}
 
@@ -622,10 +625,12 @@ func (p *Parser) parseDotCalls(base interface{}) *ParseResult {
 	for p.Current_Tok.Type == TT_DOT {
 		p.advance()
 
-		if p.Current_Tok.Type != TT_IDEN {
+		if p.Current_Tok.Type != TT_IDEN && p.Current_Tok.Type != TT_KEY {
 			return res.failure("Expected method name after '.'")
 		}
+
 		method := p.Current_Tok.Value
+		p.Current_Tok.Type = TT_IDEN
 		p.advance()
 
 		if p.Current_Tok.Type != TT_LROUNDBR {
