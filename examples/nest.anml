@@ -1,0 +1,10 @@
+nest Dog {
+  name
+  howl speak() {
+    roar this.name
+  }
+}
+
+d -> Dog()
+d.name -> "Sparky"
+d.speak()
