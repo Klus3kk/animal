@@ -1,0 +1,10 @@
+nest Cat {
+    name
+    howl meow() {
+        roar this.name, "says Meow!"
+    }
+}
+
+c -> Cat()
+c.name -> "Whiskers"
+c.meow()

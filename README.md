@@ -1,63 +1,78 @@
-# Animal
+# 🐾 Animal
 
-The goal of this project is to create a new programming language with unique features and applications. The basic functions, operators etc. will be correlated to animals characteristics and sounds.  
-You can test the language by writing:
+The goal of this project is to create a new programming language with unique features and applications. The basic functions, operators, etc., are correlated to animal characteristics and sounds.
 
+You can test the language by compiling and running:
 ```bash
 go build
-```
-
-And after that:
-
-```bash
 ./animal
 ```
 
-## Features
+---
 
-* Arithmetic operations with animal sounds (e.g., `meow`, `woof`, `moo`)
-* Conditional statements (`growl`, `sniff`, `wag`)
-* Looping constructs (`leap`, `pounce`)
-* Printing output (`roar`)
-* Variable assignments (`x -> 5`)
-* Function definitions and calls (`howl`)
+## ✨ Features
 
-## Technologies
+- Arithmetic operations using animal sounds (`meow`, `woof`, `moo`, etc.)
+- Conditional statements: `growl`, `sniff`, `wag`
+- Looping constructs: `leap`, `pounce`
+- Printing output with `roar`
+- Variable assignment via `->`
+- Function definitions and calls via `howl`
+- `nest` structures (custom object definitions)
+- Lists with built-in methods
 
-* Go language,
-* Lexer,
-* Parser,
-* Tokens.
+---
 
-## Instruction
+## 🔧 Technologies
 
-**Operators:**
+- Go language
+- Custom Lexer
+- Parser with AST generation
+- Interpreter engine
 
-* `"*"` - moo
-* `"+"` - meow
-* `"-"` - woof
-* `"/"` - drone
-* `"%"` - squeak
-* `"^"` - soar
+---
 
-**Brackets:**
+## 📘 Instruction Manual
 
-* `()` - round
-* `[]` - square
-* `{}` - curly
+### 🔢 Operators
+| Symbol | Animal Word | Meaning        |
+|--------|--------------|----------------|
+| `*`    | `moo`       | Multiplication |
+| `+`    | `meow`      | Addition       |
+| `-`    | `woof`      | Subtraction    |
+| `/`    | `drone`     | Division       |
+| `%`    | `squeak`    | Modulo         |
+| `^`    | `soar`      | Exponentiation |
 
-**Functions:**
+### 🔤 Brackets
+- `()` → Round (grouping, function calls)
+- `[]` → Square (lists)
+- `{}` → Curly (blocks)
 
-* `"roar"` — print to console
-  ```animal
-  roar "Hello", 2 meow 3
-  ```
+---
 
-* `"howl"` — define and call functions
-  ```animal
-  howl greet(name) {
-      roar "Hi", name
-  }
+## 🗣️ Functions and Output
 
-  greet("Lucas")
-  ```
+### `roar` — Print to console
+```animal
+roar "Hello", 2 meow 3
+```
+
+### `howl` — Define and call functions
+```animal
+howl greet(name) {
+    roar "Hi", name
+}
+
+greet("Lucas")
+```
+
+---
+
+## 📚 Full Documentation
+You can explore the complete documentation in the [`docs/`](docs/) folder:
+- [Introduction](docs/intro.md)
+- [Syntax Guide](docs/syntax.md)
+- [Language Features](docs/features.md)
+- [Code Examples](docs/examples.md)
+- [Standard Library](docs/stdlib.md)

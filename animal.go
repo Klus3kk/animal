@@ -56,8 +56,9 @@ var KEYWORDS = []string{
 	"growl", "sniff", "wag", // if, elif, else
 	"roar",           // print
 	"pounce", "leap", // while, for
-	"howl", // function
-	"nest", // data structure
+	"howl",   // function
+	"nest",   // data structure
+	"listen", // user input
 }
 
 // Token represents a token with its type and value
@@ -1116,28 +1117,41 @@ func (p *Parser) expr() *ParseResult {
 		return p.nest_expr()
 	}
 
-	// Handle variable access and assignment
-	if p.Current_Tok.Type == TT_IDEN { // Variable name detected
-		var_name := p.Current_Tok
+	if p.Current_Tok.matches(TT_KEY, "listen") {
 		p.advance()
+		return res.success(ListenNode{})
+	}
+
+	// Handle variable access and assignment
+	if p.Current_Tok.Type == TT_IDEN {
+		target := res.register(p.atom()) // supports dot notation like d.name
+		if res.Error != "" {
+			return res
+		}
 
 		if p.Current_Tok.Type == TT_EQ {
 			p.advance()
-
-			// This is the important part - we need to handle binary operations
-			// in the value part of the assignment
-			value_expr := res.register(p.expr()) // Get value expression
+			value_expr := res.register(p.expr())
 			if res.Error != "" {
 				return res
 			}
 
-			fmt.Printf("Parsed assignment: %s -> %v\n", var_name.Value, value_expr)
-			return res.success(VarAssignNode{Var_Name_Tok: var_name, Value_Node: value_expr})
+			// Assignment to a dot-access node (e.g., d.name -> "Sparky")
+			if dotNode, ok := target.(DotCallNode); ok {
+				dotNode.Args = []interface{}{value_expr}
+				return res.success(dotNode)
+			}
+
+			// Normal variable assignment
+			if varNode, ok := target.(VarAccessNode); ok {
+				return res.success(VarAssignNode{Var_Name_Tok: varNode.Var_Name_Tok, Value_Node: value_expr})
+			}
+
+			return res.failure("Invalid assignment target")
 		}
 
-		// If not an assignment, it's a variable access
-		p.Tok_Idx-- // Move back to the variable name
-		p.Current_Tok = p.Tokens[p.Tok_Idx]
+		// No assignment? Then it's just the expression itself
+		return res.success(target)
 	}
 
 	// Handle binary operations and other expressions
@@ -1372,6 +1386,9 @@ func (c *Context) GenerateTraceback() string {
 	return "Traceback (most recent call last): \n" + result
 }
 
+// LISTEN NODE
+type ListenNode struct{}
+
 // FUNCTION NODES
 type FunctionDefNode struct {
 	Name     string
@@ -1453,6 +1470,8 @@ func (i *Interpreter) visit(node interface{}, context *Context) *RTResult {
 		return i.visitListNode(node, context)
 	case FunctionCallNode:
 		return i.visitFunctionCallNode(node, context)
+	case ListenNode:
+		return i.visitListenNode(node, context)
 	case RoarNode:
 		return i.visitRoarNode(node, context)
 	case NumberNode:
@@ -1515,7 +1534,7 @@ func (i *Interpreter) visitDotCallNode(node DotCallNode, context *Context) *RTRe
 		return res
 	}
 
-	// 🐾 LIST METHODS
+	// LIST METHODS
 	if listVal, ok := targetVal.([]interface{}); ok {
 		switch node.Method {
 		case "sniff":
@@ -1757,6 +1776,17 @@ func (i *Interpreter) visitVarAssignNode(node VarAssignNode, context *Context) *
 
 	context.Symbol_Table.set(varName, value)
 	return res.success(value)
+}
+
+func (i *Interpreter) visitListenNode(node ListenNode, context *Context) *RTResult {
+	res := NewRTResult()
+	fmt.Print("> ") // Optional: display a prompt
+	var input string
+	_, err := fmt.Scanln(&input)
+	if err != nil {
+		return res.failure(fmt.Errorf("Failed to read input"))
+	}
+	return res.success(input)
 }
 
 // Using howl functions

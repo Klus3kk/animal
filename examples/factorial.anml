@@ -1,0 +1,9 @@
+howl factorial(n) {
+    growl n <= 1 {
+        return 1
+    } wag {
+        return n moo factorial(n woof 1)
+    }
+}
+
+roar factorial(5)
