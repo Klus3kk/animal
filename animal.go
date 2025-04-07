@@ -49,6 +49,8 @@ const (
 	TT_RCURLBR  = "RCURLBR"  //
 	TT_LCURLBR  = "LCURLBR"  //
 	TT_EOF      = "EOF"      //
+	TT_AND      = "AND"
+	TT_OR       = "OR"
 )
 
 var KEYWORDS = []string{
@@ -56,9 +58,10 @@ var KEYWORDS = []string{
 	"growl", "sniff", "wag", // if, elif, else
 	"roar",           // print
 	"pounce", "leap", // while, for
-	"howl",   // function
-	"nest",   // data structure
-	"listen", // user input
+	"howl",      // function
+	"nest",      // data structure
+	"listen",    // user input
+	"sniffback", // return
 }
 
 // Token represents a token with its type and value
@@ -267,6 +270,16 @@ func (l *Lexer) make_tokens() ([]Token, error) {
 			l.advanceBy(4)
 			posEnd := l.Pos.copy()
 			tokens = append(tokens, Token{Type: TT_KEY, Value: "howl", Pos_Start: posStart, Pos_End: posEnd})
+		} else if l.peek(3) == "and" {
+			posStart := l.Pos.copy()
+			l.advanceBy(3)
+			posEnd := l.Pos.copy()
+			tokens = append(tokens, Token{Type: TT_AND, Value: "and", Pos_Start: posStart, Pos_End: posEnd})
+		} else if l.peek(2) == "or" {
+			posStart := l.Pos.copy()
+			l.advanceBy(2)
+			posEnd := l.Pos.copy()
+			tokens = append(tokens, Token{Type: TT_OR, Value: "or", Pos_Start: posStart, Pos_End: posEnd})
 		} else {
 			posStart := l.Pos.copy()
 			char := string(l.CurrentChar)
@@ -820,6 +833,11 @@ func (p *Parser) roar_expr() *ParseResult {
 	return res.success(RoarNode{Value: values})
 }
 
+func (p *Parser) comp_expr() *ParseResult {
+	// Comparison ops: ==, !=, >, <, >=, <=
+	return p.bin_op(p.term, []string{TT_EQEQ, TT_NEQ, TT_GT, TT_LT, TT_GTE, TT_LTE})
+}
+
 func (p *Parser) growl_expr() *ParseResult {
 	res := &ParseResult{}
 	cases := []ConditionBlock{}
@@ -831,7 +849,8 @@ func (p *Parser) growl_expr() *ParseResult {
 	}
 	p.advance()
 
-	condition := res.register(p.expr())
+	condition := res.register(p.bin_op(p.comp_expr, []string{TT_AND, TT_OR}))
+
 	if res.Error != "" {
 		return res
 	}
@@ -1086,6 +1105,10 @@ func (p *Parser) term() *ParseResult {
 	return p.bin_op(p.factor, []string{TT_MUL, TT_DIV, TT_MOD, TT_CONC})
 }
 
+func (p *Parser) arith_expr() *ParseResult {
+	return p.bin_op(p.term, []string{TT_PLUS, TT_MINUS})
+}
+
 // Modified expr function to handle variable assignments with types and operations
 func (p *Parser) expr() *ParseResult {
 	res := &ParseResult{}
@@ -1155,7 +1178,7 @@ func (p *Parser) expr() *ParseResult {
 	}
 
 	// Handle binary operations and other expressions
-	return p.bin_op(p.term, []string{TT_PLUS, TT_MINUS, TT_GT, TT_LT, TT_GTE, TT_LTE, TT_EQEQ, TT_NEQ})
+	return p.bin_op(p.comp_expr, []string{TT_AND, TT_OR})
 }
 
 func (p *Parser) pounce_expr() *ParseResult {

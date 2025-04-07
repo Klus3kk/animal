@@ -1,5 +1,5 @@
 leap i from 1 to 15 {
-    growl i squeak 3 == 0 and i squeak 5 == 0 {
+    growl i squeak 4 == 0 {
         roar "FizzBuzz"
     } sniff i squeak 3 == 0 {
         roar "Fizz"

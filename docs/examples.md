@@ -23,7 +23,7 @@ leap i from 1 to 5 {
 ## 🔢 FizzBuzz
 ```anml
 leap i from 1 to 15 {
-    growl i squeak 3 == 0 and i squeak 5 == 0 {
+    growl i squeak 4 == 0 {
         roar "FizzBuzz"
     } sniff i squeak 3 == 0 {
         roar "Fizz"
@@ -78,13 +78,13 @@ roar nums
 ```anml
 howl factorial(n) {
     growl n <= 1 {
-        return 1
+        1 sniffback
     } wag {
-        return n moo factorial(n woof 1)
+        n moo factorial(n woof 1) sniffback
     }
 }
 
-roar factorial(5)  # → 120
+roar factorial(5)
 ```
 
 More programs coming soon!
