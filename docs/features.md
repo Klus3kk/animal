@@ -1,10 +1,10 @@
-# 🧬 Animal Language - Features
+# Animal Language - Features
 
 This document outlines the expressive features of the Animal Language beyond basic syntax — including **lists**, **custom structures**, and **function mechanics**.
 
 ---
 
-## 📃 Lists
+## Lists
 Animal supports lists with a full toolbox of methods:
 ```anml
 mylist -> [1, 2, 3]
@@ -15,7 +15,7 @@ mylist.prowl()       # shuffle items
 mylist.howl(2)       # remove item at index 2
 ```
 
-### 🐍 Advanced List Methods
+### Advanced List Methods
 ```anml
 nested -> [[1, 2], [3]]
 nested.lick()        # flatten → [1, 2, 3]
@@ -28,7 +28,7 @@ nums.nest(2)         # chunk into groups → [[1, 4], [5, 7]]
 
 ---
 
-## 🐚 Nests (Custom Structures)
+## Nests (Custom Structures)
 A `nest` is like a class:
 ```anml
 nest Dog {
@@ -43,14 +43,14 @@ d.name -> "Rex"
 d.speak()
 ```
 
-### 🧠 Behavior
+### Behavior
 - Fields are declared directly.
 - Methods are defined with `howl` inside the nest.
 - You can access fields with `this.` inside methods.
 
 ---
 
-## 🐺 Function Mechanics
+## Function Mechanics
 Functions are declared with `howl`:
 ```anml
 howl add(a, b) {
@@ -65,7 +65,7 @@ roar add(2, 3)  # → 5
 
 ---
 
-## 🧠 Context & Scoping
+## Context & Scoping
 - Global variables are shared across the program.
 - Functions and methods create their own local scope.
 - Nest instances store their fields in their own object-specific context.

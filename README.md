@@ -1,4 +1,4 @@
-# 🐾 Animal
+# Animal
 
 The goal of this project is to create a new programming language with unique features and applications. The basic functions, operators, etc., are correlated to animal characteristics and sounds.
 
@@ -10,7 +10,7 @@ go build
 
 ---
 
-## ✨ Features
+## Features
 
 - Arithmetic operations using animal sounds (`meow`, `woof`, `moo`, etc.)
 - Conditional statements: `growl`, `sniff`, `wag`
@@ -23,7 +23,7 @@ go build
 
 ---
 
-## 🔧 Technologies
+## Technologies
 
 - Go language
 - Custom Lexer
@@ -32,9 +32,9 @@ go build
 
 ---
 
-## 📘 Instruction Manual
+## Instruction Manual
 
-### 🔢 Operators
+### Operators
 | Symbol | Animal Word | Meaning        |
 |--------|--------------|----------------|
 | `*`    | `moo`       | Multiplication |
@@ -44,14 +44,14 @@ go build
 | `%`    | `squeak`    | Modulo         |
 | `^`    | `soar`      | Exponentiation |
 
-### 🔤 Brackets
+### Brackets
 - `()` → Round (grouping, function calls)
 - `[]` → Square (lists)
 - `{}` → Curly (blocks)
 
 ---
 
-## 🗣️ Functions and Output
+##  Functions and Output
 
 ### `roar` — Print to console
 ```animal
@@ -69,7 +69,7 @@ greet("Lucas")
 
 ---
 
-## 📚 Full Documentation
+## Full Documentation
 You can explore the complete documentation in the [`docs/`](docs/) folder:
 - [Introduction](docs/intro.md)
 - [Syntax Guide](docs/syntax.md)

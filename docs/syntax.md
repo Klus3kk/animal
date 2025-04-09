@@ -1,10 +1,10 @@
-# 🐾 Animal Language - Syntax Guide
+# Animal Language - Syntax Guide
 
 This guide walks you through the core syntax rules of the **Animal Language**, from assigning variables to calling functions, all using animal-inspired grammar.
 
 ---
 
-## 📦 Variable Assignment
+## Variable Assignment
 Use `->` to assign values:
 ```anml
 x -> 5
@@ -13,7 +13,7 @@ name -> "Luna"
 
 ---
 
-## 🧮 Arithmetic Operators
+## Arithmetic Operators
 | Operator | Meaning        | Example             |
 |----------|----------------|---------------------|
 | `meow`   | Addition (`+`) | `5 meow 3` → `8`     |
@@ -26,7 +26,7 @@ name -> "Luna"
 
 ---
 
-## 🗣 Print & Input
+## Print & Input
 ```anml
 roar "Hello, world!"
 roar x, y, "value"
@@ -36,7 +36,7 @@ name -> listen
 
 ---
 
-## 🧠 Conditionals
+## Conditionals
 ```anml
 growl x > 5 {
     roar "Big!"
@@ -49,7 +49,7 @@ growl x > 5 {
 
 ---
 
-## 🔁 Loops
+## Loops
 ### `leap` → For loop
 ```anml
 leap i from 0 to 5 {
@@ -68,7 +68,7 @@ pounce x < 3 {
 
 ---
 
-## 🐺 Functions
+## Functions
 Define using `howl`:
 ```anml
 howl square(n) {
@@ -80,7 +80,7 @@ roar square(5)  # 25
 
 ---
 
-## 🐕 Dot Notation
+## Dot Notation
 Access fields and methods on `nest` objects:
 ```anml
 d.name -> "Bolt"

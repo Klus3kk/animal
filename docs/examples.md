@@ -1,17 +1,17 @@
-# 🧪 Animal Language - Code Examples
+# Animal Language - Code Examples
 
 This page contains fully working Animal Language programs to showcase syntax and feature combinations.
 
 ---
 
-## 🖨️ Hello World
+## Hello World
 ```anml
 roar "Hello, Animal World!"
 ```
 
 ---
 
-## 🔁 Loop from 1 to 5
+## Loop from 1 to 5
 ```anml
 leap i from 1 to 5 {
     roar "Step:", i
@@ -20,7 +20,7 @@ leap i from 1 to 5 {
 
 ---
 
-## 🔢 FizzBuzz
+## FizzBuzz
 ```anml
 leap i from 1 to 15 {
     growl i squeak 4 == 0 {
@@ -37,7 +37,7 @@ leap i from 1 to 15 {
 
 ---
 
-## 🐺 Function Example
+## Function Example
 ```anml
 howl greet(name) {
     roar "Hello", name
@@ -48,7 +48,7 @@ greet("Fox")
 
 ---
 
-## 🐚 Nest Example
+## Nest Example
 ```anml
 nest Cat {
     name
@@ -64,7 +64,7 @@ c.meow()
 
 ---
 
-## 📃 List Manipulation
+## List Manipulation
 ```anml
 nums -> [1, 2, 3]
 nums.sniff(4)
@@ -74,7 +74,7 @@ roar nums
 
 ---
 
-## 🧠 Factorial Function
+## Factorial Function
 ```anml
 howl factorial(n) {
     growl n <= 1 {
