@@ -383,6 +383,15 @@ func (l *Lexer) make_boolean() Token {
 	return Token{}
 }
 
+// SNIFFBACK (return)
+type SniffbackNode struct {
+	Value interface{}
+}
+
+func (n SniffbackNode) String() string {
+	return fmt.Sprintf("(SNIFFBACK %v)", n.Value)
+}
+
 // GROWLNODE (if, else if, else)
 type GrowlNode struct {
 	Cases    []ConditionBlock // List of conditions and bodies
@@ -1177,8 +1186,19 @@ func (p *Parser) expr() *ParseResult {
 		return res.success(target)
 	}
 
-	// Handle binary operations and other expressions
-	return p.bin_op(p.comp_expr, []string{TT_AND, TT_OR})
+	expr := res.register(p.bin_op(p.comp_expr, []string{TT_AND, TT_OR}))
+	if res.Error != "" {
+		return res
+	}
+
+	// Handle postfix 'sniffback' (return)
+	if p.Current_Tok.matches(TT_KEY, "sniffback") {
+		p.advance()
+		return res.success(SniffbackNode{Value: expr})
+	}
+
+	return res.success(expr)
+
 }
 
 func (p *Parser) pounce_expr() *ParseResult {
@@ -1519,10 +1539,23 @@ func (i *Interpreter) visit(node interface{}, context *Context) *RTResult {
 		return i.visitLeapNode(node, context)
 	case StatementsNode:
 		return i.visitStatementsNode(node, context)
+	case SniffbackNode: // return node
+		val := i.visit(node.Value, context)
+		res := NewRTResult()
+		if val.Error != nil {
+			return res.failure(val.Error)
+		}
+		return res.successWithReturn(val.Value)
 	default:
 		res := NewRTResult()
 		return res.failure(fmt.Errorf("No visit method for node type %T", node))
 	}
+}
+
+func (r *RTResult) successWithReturn(value interface{}) *RTResult {
+	r.Value = value
+	r.Error = nil
+	return r // Acts as a return carrier
 }
 
 func (i *Interpreter) visitListNode(node ListNode, context *Context) *RTResult {
@@ -1868,11 +1901,11 @@ func (i *Interpreter) visitFunctionCallNode(node FunctionCallNode, context *Cont
 		funcContext.Symbol_Table.set(fnNode.ArgNames[idx], argVal)
 	}
 
-	val := res.register(i.visit(fnNode.Body, funcContext))
-	if res.Error != nil {
-		return res
+	bodyRes := i.visit(fnNode.Body, funcContext)
+	if bodyRes.Error != nil {
+		return res.failure(bodyRes.Error)
 	}
-	return res.success(val)
+	return res.success(bodyRes.Value)
 }
 
 // Updated functions to use RTResult
