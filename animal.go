@@ -790,10 +790,15 @@ func (p *Parser) howl_expr() *ParseResult {
 	}
 	p.advance()
 
-	body := res.register(p.expr())
-	if res.Error != "" {
-		return res
+	statements := []interface{}{}
+	for p.Current_Tok.Type != TT_RCURLBR && p.Current_Tok.Type != TT_EOF {
+		stmt := res.register(p.expr())
+		if res.Error != "" {
+			return res
+		}
+		statements = append(statements, stmt)
 	}
+	body := StatementsNode{Statements: statements}
 
 	if p.Current_Tok.Type != TT_RCURLBR {
 		return res.failure("Expected '}' after function body")
@@ -869,10 +874,15 @@ func (p *Parser) growl_expr() *ParseResult {
 	}
 	p.advance()
 
-	body := res.register(p.expr())
-	if res.Error != "" {
-		return res
+	stmts := []interface{}{}
+	for p.Current_Tok.Type != TT_RCURLBR && p.Current_Tok.Type != TT_EOF {
+		stmt := res.register(p.expr())
+		if res.Error != "" {
+			return res
+		}
+		stmts = append(stmts, stmt)
 	}
+	body := StatementsNode{Statements: stmts}
 
 	if p.Current_Tok.Type != TT_RCURLBR { // Expecting '}'
 		return res.failure("Expected '}' after growl body")
@@ -885,7 +895,8 @@ func (p *Parser) growl_expr() *ParseResult {
 	for p.Current_Tok.matches(TT_KEY, "sniff") {
 		p.advance()
 
-		condition := res.register(p.expr())
+		condition := res.register(p.bin_op(p.comp_expr, []string{TT_AND, TT_OR}))
+
 		if res.Error != "" {
 			return res
 		}
@@ -895,10 +906,15 @@ func (p *Parser) growl_expr() *ParseResult {
 		}
 		p.advance()
 
-		body := res.register(p.expr())
-		if res.Error != "" {
-			return res
+		stmts := []interface{}{}
+		for p.Current_Tok.Type != TT_RCURLBR && p.Current_Tok.Type != TT_EOF {
+			stmt := res.register(p.expr())
+			if res.Error != "" {
+				return res
+			}
+			stmts = append(stmts, stmt)
 		}
+		body := StatementsNode{Statements: stmts}
 
 		if p.Current_Tok.Type != TT_RCURLBR {
 			return res.failure("Expected '}' after sniff body")
@@ -917,10 +933,16 @@ func (p *Parser) growl_expr() *ParseResult {
 		}
 		p.advance()
 
-		elseCase = res.register(p.expr())
-		if res.Error != "" {
-			return res
+		stmts := []interface{}{}
+		for p.Current_Tok.Type != TT_RCURLBR && p.Current_Tok.Type != TT_EOF {
+			stmt := res.register(p.expr())
+			if res.Error != "" {
+				return res
+			}
+			stmts = append(stmts, stmt)
 		}
+
+		elseCase = StatementsNode{Statements: stmts}
 
 		if p.Current_Tok.Type != TT_RCURLBR {
 			return res.failure("Expected '}' after wag body")
@@ -961,6 +983,12 @@ func (p *Parser) parse() *ParseResult {
 	statements := []interface{}{}
 
 	for p.Current_Tok.Type != TT_EOF {
+		// Skip newlines or other non-substantive tokens if you tokenize them
+		if p.Current_Tok.Type == TT_KEY && p.Current_Tok.Value == "" {
+			p.advance()
+			continue
+		}
+
 		stmt := res.register(p.expr())
 		if res.Error != "" {
 			return res
@@ -1743,9 +1771,12 @@ func (i *Interpreter) visitDotCallNode(node DotCallNode, context *Context) *RTRe
 func (i *Interpreter) visitStatementsNode(node StatementsNode, context *Context) *RTResult {
 	res := NewRTResult()
 	for _, stmt := range node.Statements {
-		res.register(i.visit(stmt, context))
-		if res.Error != nil {
-			return res
+		result := i.visit(stmt, context)
+		if result.Error != nil {
+			return res.failure(result.Error)
+		}
+		if result.Value != nil {
+			return result // early return on sniffback or return value
 		}
 	}
 	return res.success(nil)
@@ -1860,7 +1891,7 @@ func (i *Interpreter) visitFunctionCallNode(node FunctionCallNode, context *Cont
 		return res.failure(fmt.Errorf("Function or nest '%s' is not defined", node.FuncName))
 	}
 
-	// 🐚 If it's a nest, instantiate it
+	// If it's a nest, instantiate it
 	if nestDef, isNest := fnVal.(NestDefNode); isNest {
 		instance := map[string]interface{}{}
 
