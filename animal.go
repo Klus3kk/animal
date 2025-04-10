@@ -1,4 +1,4 @@
-package main
+package animal
 
 import (
 	"fmt"
@@ -101,6 +101,10 @@ func NewLexer(fn, text string) *Lexer {
 		lexer.CurrentChar = 0
 	}
 	return lexer
+}
+
+func (l *Lexer) MakeTokens() ([]Token, error) {
+	return l.make_tokens()
 }
 
 func (l *Lexer) advance() {
@@ -291,6 +295,10 @@ func (l *Lexer) make_tokens() ([]Token, error) {
 
 	}
 	tokens = append(tokens, Token{Type: TT_EOF, Value: "EOF", Pos_Start: l.Pos.copy(), Pos_End: l.Pos.copy()})
+	for _, tok := range tokens { // debug
+		fmt.Println("TOKEN:", tok)
+	}
+
 	return tokens, err
 }
 
@@ -641,6 +649,17 @@ func (pr *ParseResult) failure(error string) *ParseResult {
 	return pr
 }
 
+func (p *Parser) Parse() *ParseResult {
+	return p.parse()
+}
+
+func (p *Parser) peek() Token {
+	if p.Tok_Idx+1 < len(p.Tokens) {
+		return p.Tokens[p.Tok_Idx+1]
+	}
+	return Token{Type: TT_EOF}
+}
+
 func (p *Parser) parseDotCalls(base interface{}) *ParseResult {
 	res := &ParseResult{}
 	node := base
@@ -862,6 +881,7 @@ func (p *Parser) growl_expr() *ParseResult {
 		return res.failure("Expected 'growl'")
 	}
 	p.advance()
+	fmt.Println("Advanced token:", p.Current_Tok)
 
 	condition := res.register(p.bin_op(p.comp_expr, []string{TT_AND, TT_OR}))
 
@@ -873,6 +893,7 @@ func (p *Parser) growl_expr() *ParseResult {
 		return res.failure("Expected '{' after growl condition")
 	}
 	p.advance()
+	fmt.Println("Advanced token:", p.Current_Tok)
 
 	stmts := []interface{}{}
 	for p.Current_Tok.Type != TT_RCURLBR && p.Current_Tok.Type != TT_EOF {
@@ -888,12 +909,14 @@ func (p *Parser) growl_expr() *ParseResult {
 		return res.failure("Expected '}' after growl body")
 	}
 	p.advance()
+	fmt.Println("Advanced token:", p.Current_Tok)
 
 	cases = append(cases, ConditionBlock{Condition: condition, Body: body})
 
 	// Handle "sniff" (else-if)
 	for p.Current_Tok.matches(TT_KEY, "sniff") {
 		p.advance()
+		fmt.Println("Advanced token:", p.Current_Tok)
 
 		condition := res.register(p.bin_op(p.comp_expr, []string{TT_AND, TT_OR}))
 
@@ -905,6 +928,7 @@ func (p *Parser) growl_expr() *ParseResult {
 			return res.failure("Expected '{' after sniff condition")
 		}
 		p.advance()
+		fmt.Println("Advanced token:", p.Current_Tok)
 
 		stmts := []interface{}{}
 		for p.Current_Tok.Type != TT_RCURLBR && p.Current_Tok.Type != TT_EOF {
@@ -920,6 +944,7 @@ func (p *Parser) growl_expr() *ParseResult {
 			return res.failure("Expected '}' after sniff body")
 		}
 		p.advance()
+		fmt.Println("Advanced token:", p.Current_Tok)
 
 		cases = append(cases, ConditionBlock{Condition: condition, Body: body})
 	}
@@ -927,11 +952,13 @@ func (p *Parser) growl_expr() *ParseResult {
 	// Handle "wag" (else)
 	if p.Current_Tok.matches(TT_KEY, "wag") {
 		p.advance()
+		fmt.Println("Advanced token:", p.Current_Tok)
 
 		if p.Current_Tok.Type != TT_LCURLBR {
 			return res.failure("Expected '{' after wag")
 		}
 		p.advance()
+		fmt.Println("Advanced token:", p.Current_Tok)
 
 		stmts := []interface{}{}
 		for p.Current_Tok.Type != TT_RCURLBR && p.Current_Tok.Type != TT_EOF {
@@ -948,6 +975,8 @@ func (p *Parser) growl_expr() *ParseResult {
 			return res.failure("Expected '}' after wag body")
 		}
 		p.advance()
+		fmt.Println("Advanced token:", p.Current_Tok)
+
 	}
 
 	return res.success(GrowlNode{Cases: cases, ElseCase: elseCase})
@@ -983,16 +1012,19 @@ func (p *Parser) parse() *ParseResult {
 	statements := []interface{}{}
 
 	for p.Current_Tok.Type != TT_EOF {
-		// Skip newlines or other non-substantive tokens if you tokenize them
-		if p.Current_Tok.Type == TT_KEY && p.Current_Tok.Value == "" {
-			p.advance()
-			continue
+		// Final guard
+		if p.Current_Tok.Type == TT_EOF {
+			break
 		}
+
+		fmt.Println("Parsing statement, current token:", p.Current_Tok)
 
 		stmt := res.register(p.expr())
 		if res.Error != "" {
 			return res
 		}
+
+		fmt.Println("Parsed statement:", stmt)
 		statements = append(statements, stmt)
 	}
 
@@ -1017,13 +1049,63 @@ type ListNode struct {
 
 // Exponentiation, highest precedence
 func (p *Parser) power() *ParseResult {
-	return p.bin_op(p.atom, []string{TT_EXP})
+	return p.bin_op(p.call_expr, []string{TT_EXP})
+
+}
+
+// For recurssion
+func (p *Parser) call_expr() *ParseResult {
+	res := &ParseResult{}
+	node := res.register(p.atom())
+	if res.Error != "" {
+		return res
+	}
+	// debug
+	fmt.Println("call_expr: building call for", node)
+
+	for p.Current_Tok.Type == TT_LROUNDBR {
+		p.advance()
+		args := []interface{}{}
+		if p.Current_Tok.Type != TT_RROUNDBR {
+			for {
+				arg := res.register(p.expr()) // <-- parse full expressions
+				if res.Error != "" {
+					return res
+				}
+				args = append(args, arg)
+				if p.Current_Tok.Type == TT_COMMA {
+					p.advance()
+				} else {
+					break
+				}
+			}
+		}
+		if p.Current_Tok.Type != TT_RROUNDBR {
+			return res.failure("Expected ')' after function arguments")
+		}
+		p.advance()
+
+		// Attach call
+		if varAccess, ok := node.(VarAccessNode); ok {
+			node = FunctionCallNode{
+				FuncName: varAccess.Var_Name_Tok.Value,
+				Args:     args,
+			}
+		} else {
+			return res.failure("Cannot call non-function")
+		}
+	}
+
+	return res.success(node)
 }
 
 // Handles parentheses and atoms (integers, booleans, strings)
 func (p *Parser) atom() *ParseResult {
 	res := &ParseResult{}
 	tok := p.Current_Tok
+	if p.Current_Tok.Type == TT_EOF {
+		return res.failure("Unexpected end of file")
+	}
 
 	if tok.Type == TT_INT || tok.Type == TT_FLOAT {
 		p.advance()
@@ -1383,23 +1465,20 @@ func (p *Parser) leap_expr() *ParseResult {
 	})
 }
 
-// The bin_op function ensures the correct precedence for binary operations
 func (p *Parser) bin_op(funcToCall func() *ParseResult, ops []string) *ParseResult {
 	res := &ParseResult{}
-
-	// Debug
-	// fmt.Println("bin_op called with ops:", ops)
-	// fmt.Println("Current token:", p.Current_Tok)
 
 	left := res.register(funcToCall())
 	if res.Error != "" {
 		return res
 	}
 
-	// fmt.Println("Left side parsed:", left)
-	// fmt.Println("Current token after left:", p.Current_Tok)
-
 	for p.Current_Tok.Type != TT_EOF && contains(ops, p.Current_Tok.Type) {
+		// Don't consume further if next token is '{' — that's for blocks like growl/wag
+		if p.peek().Type == TT_LCURLBR || p.Current_Tok.Type == TT_LCURLBR {
+			break
+		}
+
 		fmt.Println("Found operator:", p.Current_Tok)
 		op_tok := p.Current_Tok
 		p.advance()
@@ -2146,6 +2225,10 @@ func (i *Interpreter) visitLeapNode(node LeapNode, context *Context) *RTResult {
 	}
 
 	return res.success(nil)
+}
+
+func Run(text string, fn string) (interface{}, error) {
+	return run(text, fn)
 }
 
 // RUN //
