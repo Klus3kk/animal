@@ -1,4 +1,4 @@
-package animal
+package main
 
 import (
 	"bufio"

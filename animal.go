@@ -1,4 +1,4 @@
-package animal
+package main
 
 import (
 	"fmt"
@@ -1012,11 +1012,6 @@ func (p *Parser) parse() *ParseResult {
 	statements := []interface{}{}
 
 	for p.Current_Tok.Type != TT_EOF {
-		// Final guard
-		if p.Current_Tok.Type == TT_EOF {
-			break
-		}
-
 		fmt.Println("Parsing statement, current token:", p.Current_Tok)
 
 		stmt := res.register(p.expr())
@@ -1049,8 +1044,7 @@ type ListNode struct {
 
 // Exponentiation, highest precedence
 func (p *Parser) power() *ParseResult {
-	return p.bin_op(p.call_expr, []string{TT_EXP})
-
+	return p.bin_op(p.atom, []string{TT_EXP})
 }
 
 // For recurssion
@@ -1216,16 +1210,12 @@ func (p *Parser) factor() *ParseResult {
 	}
 
 	// Proceed to the next higher precedence operation
-	return p.power()
+	return p.bin_op(p.call_expr, []string{TT_EXP})
 }
 
 // Multiplication, division, modulo, and concatenation
 func (p *Parser) term() *ParseResult {
-	return p.bin_op(p.factor, []string{TT_MUL, TT_DIV, TT_MOD, TT_CONC})
-}
-
-func (p *Parser) arith_expr() *ParseResult {
-	return p.bin_op(p.term, []string{TT_PLUS, TT_MINUS})
+	return p.bin_op(p.factor, []string{TT_MUL, TT_DIV, TT_MOD, TT_CONC, TT_PLUS, TT_MINUS})
 }
 
 // Modified expr function to handle variable assignments with types and operations
@@ -1265,49 +1255,59 @@ func (p *Parser) expr() *ParseResult {
 	}
 
 	// Handle variable access and assignment
-	if p.Current_Tok.Type == TT_IDEN {
-		target := res.register(p.atom()) // supports dot notation like d.name
+	// If next token is EQ (->), parse as assignment
+	if p.Current_Tok.Type == TT_IDEN && p.peek().Type == TT_EQ {
+		target := res.register(p.atom())
 		if res.Error != "" {
 			return res
 		}
 
-		if p.Current_Tok.Type == TT_EQ {
-			p.advance()
-			value_expr := res.register(p.expr())
-			if res.Error != "" {
-				return res
-			}
-
-			// Assignment to a dot-access node (e.g., d.name -> "Sparky")
-			if dotNode, ok := target.(DotCallNode); ok {
-				dotNode.Args = []interface{}{value_expr}
-				return res.success(dotNode)
-			}
-
-			// Normal variable assignment
-			if varNode, ok := target.(VarAccessNode); ok {
-				return res.success(VarAssignNode{Var_Name_Tok: varNode.Var_Name_Tok, Value_Node: value_expr})
-			}
-
-			return res.failure("Invalid assignment target")
+		p.advance() // consume ->
+		value_expr := res.register(p.expr())
+		if res.Error != "" {
+			return res
 		}
 
-		// No assignment? Then it's just the expression itself
-		return res.success(target)
+		if dotNode, ok := target.(DotCallNode); ok {
+			dotNode.Args = []interface{}{value_expr}
+			return res.success(dotNode)
+		}
+		if varNode, ok := target.(VarAccessNode); ok {
+			return res.success(VarAssignNode{Var_Name_Tok: varNode.Var_Name_Tok, Value_Node: value_expr})
+		}
+
+		return res.failure("Invalid assignment target")
 	}
 
-	expr := res.register(p.bin_op(p.comp_expr, []string{TT_AND, TT_OR}))
+	// Else parse the full binary expression
+	node := res.register(p.bin_op(p.comp_expr, []string{TT_AND, TT_OR}))
 	if res.Error != "" {
 		return res
 	}
 
-	// Handle postfix 'sniffback' (return)
+	// sniffback handling
 	if p.Current_Tok.matches(TT_KEY, "sniffback") {
 		p.advance()
-		return res.success(SniffbackNode{Value: expr})
+		return res.success(SniffbackNode{Value: node})
 	}
 
-	return res.success(expr)
+	// ✅ dot-assignment support
+	if p.Current_Tok.Type == TT_EQ {
+		p.advance()
+		value_expr := res.register(p.expr())
+		if res.Error != "" {
+			return res
+		}
+
+		// Must be a dot-access target
+		if dotNode, ok := node.(DotCallNode); ok {
+			dotNode.Args = []interface{}{value_expr}
+			return res.success(dotNode)
+		}
+		return res.failure("Assignment target must be a variable or object property")
+	}
+
+	return res.success(node)
 
 }
 
@@ -1849,16 +1849,21 @@ func (i *Interpreter) visitDotCallNode(node DotCallNode, context *Context) *RTRe
 
 func (i *Interpreter) visitStatementsNode(node StatementsNode, context *Context) *RTResult {
 	res := NewRTResult()
+	var lastValue interface{}
+
 	for _, stmt := range node.Statements {
 		result := i.visit(stmt, context)
 		if result.Error != nil {
 			return res.failure(result.Error)
 		}
+
+		// Only store the result if it's not sniffback or nil
 		if result.Value != nil {
-			return result // early return on sniffback or return value
+			lastValue = result.Value
 		}
 	}
-	return res.success(nil)
+
+	return res.success(lastValue)
 }
 
 func (i *Interpreter) visitRoarNode(node RoarNode, context *Context) *RTResult {
@@ -2057,8 +2062,9 @@ func (i *Interpreter) visitBinOpNode(node BinOpNode, context *Context) *RTResult
 	rightValue := rightResult.Value
 
 	switch node.Op_Tok.Type {
+
+	// Arithmetic Operators
 	case TT_PLUS, TT_MINUS, TT_MUL, TT_DIV, TT_MOD, TT_EXP:
-		// Handle arithmetic operations
 		leftFloat, okLeft := leftValue.(float64)
 		rightFloat, okRight := rightValue.(float64)
 		if !okLeft || !okRight {
@@ -2083,8 +2089,8 @@ func (i *Interpreter) visitBinOpNode(node BinOpNode, context *Context) *RTResult
 			return res.success(math.Pow(leftFloat, rightFloat))
 		}
 
+	// String Concatenation
 	case TT_CONC:
-		// Handle string concatenation
 		leftStr, okLeft := leftValue.(string)
 		rightStr, okRight := rightValue.(string)
 		if okLeft && okRight {
@@ -2115,11 +2121,25 @@ func (i *Interpreter) visitBinOpNode(node BinOpNode, context *Context) *RTResult
 			return res.success(leftFloat != rightFloat)
 		}
 
+	// Logical Operators
+	case TT_AND, TT_OR:
+		leftBool, okLeft := leftValue.(bool)
+		rightBool, okRight := rightValue.(bool)
+		if !okLeft || !okRight {
+			return res.failure(fmt.Errorf("Expected booleans for logical operations"))
+		}
+
+		if node.Op_Tok.Type == TT_AND {
+			return res.success(leftBool && rightBool)
+		} else {
+			return res.success(leftBool || rightBool)
+		}
+
 	default:
 		return res.failure(fmt.Errorf("Unknown operator: %s", node.Op_Tok.Value))
 	}
 
-	return res.failure(fmt.Errorf("Unknown error"))
+	return res.failure(fmt.Errorf("Unexpected fallthrough in visitBinOpNode"))
 }
 
 func (i *Interpreter) visitUnaryOpNode(node UnaryOpNode, context *Context) *RTResult {
