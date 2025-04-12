@@ -1,0 +1,3 @@
+#!/usr/bin/env animal
+roar "Hello from shebang script!"
+roar __args__

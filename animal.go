@@ -284,6 +284,11 @@ func (l *Lexer) make_tokens() ([]Token, error) {
 			l.advanceBy(2)
 			posEnd := l.Pos.copy()
 			tokens = append(tokens, Token{Type: TT_OR, Value: "or", Pos_Start: posStart, Pos_End: posEnd})
+		} else if l.peek(2) == "::" {
+			l.advanceBy(2)
+			for l.CurrentChar != 0 && l.CurrentChar != '\n' {
+				l.advance() // Skip until end of line
+			}
 		} else {
 			posStart := l.Pos.copy()
 			char := string(l.CurrentChar)

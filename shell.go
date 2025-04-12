@@ -62,8 +62,17 @@ func main() {
 		Symbol_Table: globalSymbolTable,
 	}
 
-	// Run file mode: ./animal file.anml
-	if len(args) == 1 && strings.HasSuffix(args[0], ".anml") {
+	// Inject CLI arguments as __args__ (converted to []interface{})
+	if len(args) > 0 {
+		interfaceArgs := make([]interface{}, len(args))
+		for i, v := range args {
+			interfaceArgs[i] = v
+		}
+		context.Symbol_Table.set("__args__", interfaceArgs)
+	}
+
+	// Run file mode: ./animal script.anml arg1 arg2 ...
+	if len(args) >= 1 && strings.HasSuffix(args[0], ".anml") {
 		codeBytes, err := os.ReadFile(args[0])
 		if err != nil {
 			fmt.Println("Error reading file:", err)
@@ -71,6 +80,16 @@ func main() {
 		}
 		code := string(codeBytes)
 		code = strings.TrimPrefix(code, "\uFEFF") // remove BOM if present
+
+		// Skip shebang line if present
+		if strings.HasPrefix(code, "#!") {
+			lines := strings.SplitN(code, "\n", 2)
+			if len(lines) > 1 {
+				code = lines[1]
+			} else {
+				code = ""
+			}
+		}
 
 		_, err = customRun(code, args[0], context)
 		if err != nil {

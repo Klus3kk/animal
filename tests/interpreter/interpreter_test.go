@@ -5,6 +5,27 @@ import (
 	"testing"
 )
 
+func TestArgs_PassedIntoScript(t *testing.T) {
+	context := &animal.Context{
+		DisplayName:  "<test>",
+		Symbol_Table: animal.NewSymbolTable(),
+	}
+	context.Symbol_Table.set("__args__", []interface{}{"foo", "bar", "baz"})
+
+	result, err := animal.Run(`__args__`, "<test>")
+	if err != nil {
+		t.Fatalf("Runtime error: %v", err)
+	}
+
+	args, ok := result.([]interface{})
+	if !ok {
+		t.Fatalf("Expected list result, got: %T", result)
+	}
+	if len(args) != 3 || args[0] != "foo" || args[2] != "baz" {
+		t.Errorf("Expected [foo, bar, baz], got: %v", result)
+	}
+}
+
 func TestInterpreter_Arithmetic(t *testing.T) {
 	result, err := animal.Run(`5 meow 3`, "<test>")
 	if err != nil {
