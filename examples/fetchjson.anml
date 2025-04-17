@@ -1,0 +1,2 @@
+j -> fetch_json("examples/testing_files/data.json")
+roar j[0].name  :: Alice

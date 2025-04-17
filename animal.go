@@ -1,9 +1,12 @@
 package main
 
 import (
+	"encoding/csv"
+	"encoding/json"
 	"fmt"
 	"math"
 	"math/rand"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -58,10 +61,12 @@ var KEYWORDS = []string{
 	"growl", "sniff", "wag", // if, elif, else
 	"roar",           // print
 	"pounce", "leap", // while, for
-	"howl",      // function
-	"nest",      // data structure
-	"listen",    // user input
-	"sniffback", // return
+	"howl",                                       // function
+	"nest",                                       // data structure
+	"listen",                                     // user input
+	"sniffback",                                  // return
+	"fetch", "drop", "drop_append", "sniff_file", // file i/o
+	"fetch_json", "fetch_csv", // Fetching json, csv
 }
 
 // Token represents a token with its type and value
@@ -373,6 +378,10 @@ func (l *Lexer) make_string() Token {
 	posStart := l.Pos.copy()
 	l.advance() // Skip opening quote
 	strVal := ""
+
+	//strVal = strings.ReplaceAll(strVal, `\n`, "\n")
+	//strVal = strings.ReplaceAll(strVal, `\t`, "\t")
+	//strVal = strings.ReplaceAll(strVal, `\\`, `\`)
 
 	for l.CurrentChar != 0 && l.CurrentChar != '"' {
 		strVal += string(l.CurrentChar)
@@ -722,6 +731,206 @@ func (p *Parser) parseDotCalls(base interface{}) *ParseResult {
 	return res.success(node)
 }
 
+func (p *Parser) fetch_csv_expr() *ParseResult {
+	res := &ParseResult{}
+
+	if !p.Current_Tok.matches(TT_KEY, "fetch_csv") {
+		return res.failure("Expected 'fetch_csv'")
+	}
+	p.advance()
+
+	if p.Current_Tok.Type != TT_LROUNDBR {
+		return res.failure("Expected '(' after 'fetch_csv'")
+	}
+	p.advance()
+
+	filename := res.register(p.expr())
+	if res.Error != "" {
+		return res
+	}
+
+	var sep interface{} = nil
+	var header interface{} = nil
+
+	if p.Current_Tok.Type == TT_COMMA {
+		p.advance()
+		sep = res.register(p.expr())
+		if res.Error != "" {
+			return res
+		}
+
+		if p.Current_Tok.Type == TT_COMMA {
+			p.advance()
+			header = res.register(p.expr())
+			if res.Error != "" {
+				return res
+			}
+		}
+	}
+
+	if p.Current_Tok.Type != TT_RROUNDBR {
+		return res.failure("Expected ')' after arguments")
+	}
+	p.advance()
+
+	return res.success(FetchCSVNode{
+		Filename:  filename,
+		Separator: sep,
+		Header:    header,
+	})
+}
+
+func (p *Parser) fetch_json_expr() *ParseResult {
+	res := &ParseResult{}
+
+	if !p.Current_Tok.matches(TT_KEY, "fetch_json") {
+		return res.failure("Expected 'fetch_json'")
+	}
+	p.advance()
+
+	if p.Current_Tok.Type != TT_LROUNDBR {
+		return res.failure("Expected '(' after 'fetch_json'")
+	}
+	p.advance()
+
+	filename := res.register(p.expr())
+	if res.Error != "" {
+		return res
+	}
+
+	if p.Current_Tok.Type != TT_RROUNDBR {
+		return res.failure("Expected ')' after filename")
+	}
+	p.advance()
+
+	return res.success(FetchJSONNode{Filename: filename})
+}
+
+func (p *Parser) sniff_file_expr() *ParseResult {
+	res := &ParseResult{}
+
+	if !p.Current_Tok.matches(TT_KEY, "sniff_file") {
+		return res.failure("Expected 'sniff_file'")
+	}
+	p.advance()
+
+	if p.Current_Tok.Type != TT_LROUNDBR {
+		return res.failure("Expected '(' after 'sniff_file'")
+	}
+	p.advance()
+
+	filename := res.register(p.expr())
+	if res.Error != "" {
+		return res
+	}
+
+	if p.Current_Tok.Type != TT_RROUNDBR {
+		return res.failure("Expected ')' after filename")
+	}
+	p.advance()
+
+	return res.success(SniffFileNode{Filename: filename})
+}
+
+func (p *Parser) drop_append_expr() *ParseResult {
+	res := &ParseResult{}
+	if !p.Current_Tok.matches(TT_KEY, "drop_append") {
+		return res.failure("Expected 'drop_append'")
+	}
+	p.advance()
+
+	if p.Current_Tok.Type != TT_LROUNDBR {
+		return res.failure("Expected '(' after 'drop_append'")
+	}
+	p.advance()
+
+	filename := res.register(p.expr())
+	if res.Error != "" {
+		return res
+	}
+
+	if p.Current_Tok.Type != TT_COMMA {
+		return res.failure("Expected ',' after filename")
+	}
+	p.advance()
+
+	content := res.register(p.expr())
+	if res.Error != "" {
+		return res
+	}
+
+	if p.Current_Tok.Type != TT_RROUNDBR {
+		return res.failure("Expected ')' after content")
+	}
+	p.advance()
+
+	return res.success(DropAppendNode{Filename: filename, Content: content})
+}
+
+func (p *Parser) fetch_expr() *ParseResult {
+	res := &ParseResult{}
+
+	// fetch (
+	if !p.Current_Tok.matches(TT_KEY, "fetch") {
+		return res.failure("Expected 'fetch'")
+	}
+	p.advance()
+
+	if p.Current_Tok.Type != TT_LROUNDBR {
+		return res.failure("Expected '(' after 'fetch'")
+	}
+	p.advance()
+
+	arg := res.register(p.expr())
+	if res.Error != "" {
+		return res
+	}
+
+	if p.Current_Tok.Type != TT_RROUNDBR {
+		return res.failure("Expected ')' after fetch argument")
+	}
+	p.advance()
+
+	return res.success(FetchNode{Filename: arg})
+}
+
+func (p *Parser) drop_expr() *ParseResult {
+	res := &ParseResult{}
+
+	// drop (
+	if !p.Current_Tok.matches(TT_KEY, "drop") {
+		return res.failure("Expected 'drop'")
+	}
+	p.advance()
+
+	if p.Current_Tok.Type != TT_LROUNDBR {
+		return res.failure("Expected '(' after 'drop'")
+	}
+	p.advance()
+
+	filename := res.register(p.expr())
+	if res.Error != "" {
+		return res
+	}
+
+	if p.Current_Tok.Type != TT_COMMA {
+		return res.failure("Expected ',' after filename")
+	}
+	p.advance()
+
+	content := res.register(p.expr())
+	if res.Error != "" {
+		return res
+	}
+
+	if p.Current_Tok.Type != TT_RROUNDBR {
+		return res.failure("Expected ')' after content")
+	}
+	p.advance()
+
+	return res.success(DropNode{Filename: filename, Content: content})
+}
+
 func (p *Parser) nest_expr() *ParseResult {
 	res := &ParseResult{}
 
@@ -1045,6 +1254,33 @@ type ListNode struct {
 	Elements []interface{}
 }
 
+// File I/O Nodes
+type FetchJSONNode struct {
+	Filename interface{}
+}
+
+type FetchCSVNode struct {
+	Filename  interface{}
+	Separator interface{}
+	Header    interface{}
+}
+
+type SniffFileNode struct {
+	Filename interface{}
+}
+type FetchNode struct {
+	Filename interface{}
+}
+type DropNode struct {
+	Filename interface{}
+	Content  interface{}
+}
+
+type DropAppendNode struct {
+	Filename interface{}
+	Content  interface{}
+}
+
 // HIERARCHY //
 
 // Exponentiation, highest precedence
@@ -1060,7 +1296,7 @@ func (p *Parser) call_expr() *ParseResult {
 		return res
 	}
 	// debug
-	fmt.Println("call_expr: building call for", node)
+	// fmt.Println("call_expr: building call for", node)
 
 	for p.Current_Tok.Type == TT_LROUNDBR {
 		p.advance()
@@ -1102,8 +1338,13 @@ func (p *Parser) call_expr() *ParseResult {
 func (p *Parser) atom() *ParseResult {
 	res := &ParseResult{}
 	tok := p.Current_Tok
+
 	if p.Current_Tok.Type == TT_EOF {
 		return res.failure("Unexpected end of file")
+	}
+
+	if tok.Type == TT_KEY {
+		return p.expr()
 	}
 
 	if tok.Type == TT_INT || tok.Type == TT_FLOAT {
@@ -1258,6 +1499,27 @@ func (p *Parser) expr() *ParseResult {
 		p.advance()
 		return res.success(ListenNode{})
 	}
+	if p.Current_Tok.matches(TT_KEY, "fetch") {
+		return p.fetch_expr()
+	}
+	if p.Current_Tok.matches(TT_KEY, "drop") {
+		return p.drop_expr()
+	}
+
+	if p.Current_Tok.matches(TT_KEY, "drop_append") {
+		return p.drop_append_expr()
+	}
+
+	if p.Current_Tok.matches(TT_KEY, "sniff_file") {
+		return p.sniff_file_expr()
+	}
+
+	if p.Current_Tok.matches(TT_KEY, "fetch_json") {
+		return p.fetch_json_expr()
+	}
+	if p.Current_Tok.matches(TT_KEY, "fetch_csv") {
+		return p.fetch_csv_expr()
+	}
 
 	// Handle variable access and assignment
 	// If next token is EQ (->), parse as assignment
@@ -1296,7 +1558,7 @@ func (p *Parser) expr() *ParseResult {
 		return res.success(SniffbackNode{Value: node})
 	}
 
-	// ✅ dot-assignment support
+	// dot-assignment support
 	if p.Current_Tok.Type == TT_EQ {
 		p.advance()
 		value_expr := res.register(p.expr())
@@ -1625,6 +1887,18 @@ func (i *Interpreter) visit(node interface{}, context *Context) *RTResult {
 		return i.visitListNode(node, context)
 	case FunctionCallNode:
 		return i.visitFunctionCallNode(node, context)
+	case DropNode:
+		return i.visitDropNode(node, context)
+	case FetchNode:
+		return i.visitFetchNode(node, context)
+	case DropAppendNode:
+		return i.visitDropAppendNode(node, context)
+	case SniffFileNode:
+		return i.visitSniffFileNode(node, context)
+	case FetchJSONNode:
+		return i.visitFetchJSONNode(node, context)
+	case FetchCSVNode:
+		return i.visitFetchCSVNode(node, context)
 	case ListenNode:
 		return i.visitListenNode(node, context)
 	case RoarNode:
@@ -1662,6 +1936,195 @@ func (i *Interpreter) visit(node interface{}, context *Context) *RTResult {
 		res := NewRTResult()
 		return res.failure(fmt.Errorf("No visit method for node type %T", node))
 	}
+}
+
+func (i *Interpreter) visitFetchJSONNode(node FetchJSONNode, context *Context) *RTResult {
+	res := NewRTResult()
+
+	filenameVal := res.register(i.visit(node.Filename, context))
+	if res.Error != nil {
+		return res
+	}
+
+	filename, ok := filenameVal.(string)
+	if !ok {
+		return res.failure(fmt.Errorf("fetch_json expects filename to be a string"))
+	}
+
+	data, err := os.ReadFile(filename)
+	if err != nil {
+		return res.failure(fmt.Errorf("Failed to read file: %v", err))
+	}
+
+	var parsed interface{}
+	if err := json.Unmarshal(data, &parsed); err != nil {
+		return res.failure(fmt.Errorf("Invalid JSON: %v", err))
+	}
+
+	return res.success(parsed)
+}
+
+func (i *Interpreter) visitFetchCSVNode(node FetchCSVNode, context *Context) *RTResult {
+	res := NewRTResult()
+
+	filenameVal := res.register(i.visit(node.Filename, context))
+	if res.Error != nil {
+		return res
+	}
+	filename, ok := filenameVal.(string)
+	if !ok {
+		return res.failure(fmt.Errorf("fetch_csv expects filename to be a string"))
+	}
+
+	// Default: comma, header = true
+	sep := ','
+	header := true
+
+	if node.Separator != nil {
+		sepRaw := res.register(i.visit(node.Separator, context))
+		if res.Error != nil {
+			return res
+		}
+		sepStr, ok := sepRaw.(string)
+		if !ok || len(sepStr) != 1 {
+			return res.failure(fmt.Errorf("Separator must be a single character string"))
+		}
+		sep = rune(sepStr[0])
+	}
+
+	if node.Header != nil {
+		headerRaw := res.register(i.visit(node.Header, context))
+		if res.Error != nil {
+			return res
+		}
+		header, _ = headerRaw.(bool)
+	}
+
+	file, err := os.Open(filename)
+	if err != nil {
+		return res.failure(fmt.Errorf("Could not open CSV file: %v", err))
+	}
+	defer file.Close()
+
+	reader := csv.NewReader(file)
+	reader.Comma = sep
+
+	rows, err := reader.ReadAll()
+	if err != nil {
+		return res.failure(fmt.Errorf("Could not read CSV: %v", err))
+	}
+
+	var result []interface{}
+	if header && len(rows) > 0 {
+		keys := rows[0]
+		for _, row := range rows[1:] {
+			entry := map[string]interface{}{}
+			for i := range keys {
+				if i < len(row) {
+					entry[keys[i]] = row[i]
+				}
+			}
+			result = append(result, entry)
+		}
+	} else {
+		for _, row := range rows {
+			r := []interface{}{}
+			for _, val := range row {
+				r = append(r, val)
+			}
+			result = append(result, r)
+		}
+	}
+
+	return res.success(result)
+}
+
+func (i *Interpreter) visitSniffFileNode(node SniffFileNode, context *Context) *RTResult {
+	res := NewRTResult()
+	filenameVal := res.register(i.visit(node.Filename, context))
+	if res.Error != nil {
+		return res
+	}
+
+	filename, ok := filenameVal.(string)
+	if !ok {
+		return res.failure(fmt.Errorf("sniff_file expects a string filename"))
+	}
+
+	if _, err := os.Stat(filename); err == nil {
+		return res.success(true)
+	}
+	return res.success(false)
+}
+
+func (i *Interpreter) visitDropAppendNode(node DropAppendNode, context *Context) *RTResult {
+	res := NewRTResult()
+	filenameVal := res.register(i.visit(node.Filename, context))
+	if res.Error != nil {
+		return res
+	}
+	contentVal := res.register(i.visit(node.Content, context))
+	if res.Error != nil {
+		return res
+	}
+	filename, ok := filenameVal.(string)
+	if !ok {
+		return res.failure(fmt.Errorf("drop_append expects filename to be a string"))
+	}
+	file, err := os.OpenFile(filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return res.failure(fmt.Errorf("could not open file for appending: %v", err))
+	}
+	defer file.Close()
+	if _, err := file.WriteString(fmt.Sprint(contentVal)); err != nil {
+		return res.failure(fmt.Errorf("could not append to file: %v", err))
+	}
+	return res.success(nil)
+}
+
+func (i *Interpreter) visitFetchNode(node FetchNode, context *Context) *RTResult {
+	res := NewRTResult()
+	filenameVal := res.register(i.visit(node.Filename, context))
+	if res.Error != nil {
+		return res
+	}
+
+	filename, ok := filenameVal.(string)
+	if !ok {
+		return res.failure(fmt.Errorf("fetch expects a string filename"))
+	}
+
+	content, err := os.ReadFile(filename)
+	if err != nil {
+		return res.failure(fmt.Errorf("could not read file: %v", err))
+	}
+
+	return res.success(string(content))
+}
+
+func (i *Interpreter) visitDropNode(node DropNode, context *Context) *RTResult {
+	res := NewRTResult()
+	filenameVal := res.register(i.visit(node.Filename, context))
+	if res.Error != nil {
+		return res
+	}
+
+	contentVal := res.register(i.visit(node.Content, context))
+	if res.Error != nil {
+		return res
+	}
+
+	filename, ok := filenameVal.(string)
+	if !ok {
+		return res.failure(fmt.Errorf("drop expects filename to be string"))
+	}
+
+	err := os.WriteFile(filename, []byte(fmt.Sprint(contentVal)), 0644)
+	if err != nil {
+		return res.failure(fmt.Errorf("could not write file: %v", err))
+	}
+
+	return res.success(nil)
 }
 
 func (r *RTResult) successWithReturn(value interface{}) *RTResult {

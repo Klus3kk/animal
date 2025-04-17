@@ -1,0 +1,6 @@
+:: Checking if the file exists
+growl sniff_file("sample.txt") {
+    roar "Exists!"
+} wag {
+    roar "Missing!"
+}

@@ -1,0 +1,12 @@
+:: Read/write file
+:: drop("sample.txt", "Hello from Animal!")
+:: content -> fetch("sample.txt")
+:: roar content
+
+:: Appending to the file
+drop("sample.txt", "Start\n")
+drop_append("sample.txt", "Line A\n")
+drop_append("sample.txt", "Line B\n")
+content -> fetch("sample.txt")
+roar content
+

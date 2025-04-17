@@ -1,0 +1,5 @@
+c -> fetch_csv("examples/testing_files/data.csv")
+roar c[1].age   :: 30
+
+r -> fetch_csv("examples/testing_files/raw.csv", ";", false)
+roar r[0][0]    :: Alice
