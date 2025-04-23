@@ -1254,6 +1254,12 @@ type ListNode struct {
 	Elements []interface{}
 }
 
+// ListAccessNode
+type ListAccessNode struct {
+	Target interface{}
+	Index  interface{}
+}
+
 // File I/O Nodes
 type FetchJSONNode struct {
 	Filename interface{}
@@ -1389,9 +1395,28 @@ func (p *Parser) atom() *ParseResult {
 			return p.parseDotCalls(node)
 		}
 
-		// Variable access
+		// Variable access + list index support
 		node := VarAccessNode{Var_Name_Tok: tok}
-		return p.parseDotCalls(node)
+		resultNode := interface{}(node)
+
+		for p.Current_Tok.Type == TT_LSQRBR {
+			p.advance()
+			index := res.register(p.expr())
+			if res.Error != "" {
+				return res
+			}
+			if p.Current_Tok.Type != TT_RSQRBR {
+				return res.failure("Expected ']' after index")
+			}
+			p.advance()
+
+			resultNode = ListAccessNode{
+				Target: resultNode,
+				Index:  index,
+			}
+		}
+
+		return p.parseDotCalls(resultNode)
 	} else if tok.Type == TT_LROUNDBR {
 		p.advance()
 		expr := res.register(p.expr())
@@ -1885,6 +1910,8 @@ func (i *Interpreter) visit(node interface{}, context *Context) *RTResult {
 		return i.visitNestDefNode(node, context)
 	case ListNode:
 		return i.visitListNode(node, context)
+	case ListAccessNode:
+		return i.visitListAccessNode(node, context)
 	case FunctionCallNode:
 		return i.visitFunctionCallNode(node, context)
 	case DropNode:
@@ -2131,6 +2158,34 @@ func (r *RTResult) successWithReturn(value interface{}) *RTResult {
 	r.Value = value
 	r.Error = nil
 	return r // Acts as a return carrier
+}
+
+func (i *Interpreter) visitListAccessNode(node ListAccessNode, context *Context) *RTResult {
+	res := NewRTResult()
+	target := res.register(i.visit(node.Target, context))
+	if res.Error != nil {
+		return res
+	}
+	index := res.register(i.visit(node.Index, context))
+	if res.Error != nil {
+		return res
+	}
+
+	idxFloat, ok := index.(float64)
+	if !ok {
+		return res.failure(fmt.Errorf("List index must be a number"))
+	}
+	idx := int(idxFloat)
+
+	switch t := target.(type) {
+	case []interface{}:
+		if idx < 0 || idx >= len(t) {
+			return res.failure(fmt.Errorf("List index out of bounds"))
+		}
+		return res.success(t[idx])
+	default:
+		return res.failure(fmt.Errorf("Target is not a list: %T", t))
+	}
 }
 
 func (i *Interpreter) visitListNode(node ListNode, context *Context) *RTResult {
