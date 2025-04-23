@@ -1,0 +1,7 @@
+x -> "ca"
+
+mimic x {
+  "dog" -> roar "woof"
+  "cat" -> roar "meow"
+  _ -> roar "???"
+}

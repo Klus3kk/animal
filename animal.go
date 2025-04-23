@@ -67,6 +67,7 @@ var KEYWORDS = []string{
 	"sniffback",                                  // return
 	"fetch", "drop", "drop_append", "sniff_file", // file i/o
 	"fetch_json", "fetch_csv", // Fetching json, csv
+	"mimic", "_", // mimic
 }
 
 // Token represents a token with its type and value
@@ -187,7 +188,7 @@ func (l *Lexer) make_tokens() ([]Token, error) {
 			l.advanceBy(4)
 			posEnd := l.Pos.copy()
 			tokens = append(tokens, Token{Type: TT_KEY, Value: "leap", Pos_Start: posStart, Pos_End: posEnd})
-		} else if strings.IndexByte(LETTERS, l.CurrentChar) != -1 {
+		} else if strings.ContainsAny(string(l.CurrentChar), LETTERS+"_") {
 			tokens = append(tokens, l.make_identifier()) // Tokenize letter
 		} else if l.peek(2) == "->" {
 			posStart := l.Pos.copy()
@@ -326,6 +327,12 @@ func (l *Lexer) make_identifier() Token {
 		idStr += string(l.CurrentChar)
 		l.advance()
 	}
+
+	// Force underscore to be treated as a keyword
+	if idStr == "_" {
+		return Token{Type: TT_KEY, Value: "_", Pos_Start: Pos_Start, Pos_End: l.Pos}
+	}
+
 	tok_Type := TT_IDEN
 
 	// Check if identifier is a keyword only if not immediately after '.'
@@ -403,6 +410,18 @@ func (l *Lexer) make_boolean() Token {
 		return Token{Type: TT_BOOL, Value: "false", Pos_Start: posStart, Pos_End: l.Pos.copy()}
 	}
 	return Token{}
+}
+
+// MIMIC (switch)
+type MimicNode struct {
+	Expr      interface{}
+	Cases     []MimicCase
+	Otherwise interface{}
+}
+
+type MimicCase struct {
+	MatchValue interface{}
+	Body       interface{}
 }
 
 // SNIFFBACK (return)
@@ -1085,6 +1104,75 @@ func (p *Parser) comp_expr() *ParseResult {
 	return p.bin_op(p.term, []string{TT_EQEQ, TT_NEQ, TT_GT, TT_LT, TT_GTE, TT_LTE})
 }
 
+func (p *Parser) mimic_expr() *ParseResult {
+	res := &ParseResult{}
+
+	if !p.Current_Tok.matches(TT_KEY, "mimic") {
+		return res.failure("Expected 'mimic'")
+	}
+	p.advance()
+
+	expr := res.register(p.expr())
+	if res.Error != "" {
+		return res
+	}
+
+	if p.Current_Tok.Type != TT_LCURLBR {
+		return res.failure("Expected '{' after mimic expression")
+	}
+	p.advance()
+
+	cases := []MimicCase{}
+	var otherwise interface{}
+
+	for p.Current_Tok.Type != TT_RCURLBR && p.Current_Tok.Type != TT_EOF {
+		if p.Current_Tok.Type == TT_KEY && p.Current_Tok.Value == "_" {
+			p.advance()
+			if p.Current_Tok.Type != TT_EQ {
+				return res.failure("Expected '->' after '_'")
+			}
+			p.advance()
+
+			otherwise = res.register(p.expr())
+			if res.Error != "" {
+				return res
+			}
+			continue
+		}
+
+		match := res.register(p.atom())
+		if res.Error != "" {
+			return res
+		}
+
+		if p.Current_Tok.Type != TT_EQ {
+			return res.failure("Expected '->' after match value")
+		}
+		p.advance()
+
+		body := res.register(p.expr())
+		if res.Error != "" {
+			return res
+		}
+
+		cases = append(cases, MimicCase{
+			MatchValue: match,
+			Body:       body,
+		})
+	}
+
+	if p.Current_Tok.Type != TT_RCURLBR {
+		return res.failure("Expected '}' at end of mimic block")
+	}
+	p.advance()
+
+	return res.success(MimicNode{
+		Expr:      expr,
+		Cases:     cases,
+		Otherwise: otherwise,
+	})
+}
+
 func (p *Parser) growl_expr() *ParseResult {
 	res := &ParseResult{}
 	cases := []ConditionBlock{}
@@ -1503,6 +1591,9 @@ func (p *Parser) expr() *ParseResult {
 		return p.growl_expr()
 	}
 
+	if p.Current_Tok.matches(TT_KEY, "mimic") {
+		return p.mimic_expr()
+	}
 	// Loops
 	if p.Current_Tok.matches(TT_KEY, "pounce") {
 		return p.pounce_expr()
@@ -1952,6 +2043,8 @@ func (i *Interpreter) visit(node interface{}, context *Context) *RTResult {
 		return i.visitLeapNode(node, context)
 	case StatementsNode:
 		return i.visitStatementsNode(node, context)
+	case MimicNode:
+		return i.visitMimicNode(node, context)
 	case SniffbackNode: // return node
 		val := i.visit(node.Value, context)
 		res := NewRTResult()
@@ -1963,6 +2056,35 @@ func (i *Interpreter) visit(node interface{}, context *Context) *RTResult {
 		res := NewRTResult()
 		return res.failure(fmt.Errorf("No visit method for node type %T", node))
 	}
+}
+
+func (i *Interpreter) visitMimicNode(node MimicNode, context *Context) *RTResult {
+	res := NewRTResult()
+
+	// Evaluate the expression being matched
+	value := res.register(i.visit(node.Expr, context))
+	if res.Error != nil {
+		return res
+	}
+
+	// Try to match with each case
+	for _, mc := range node.Cases {
+		matchVal := res.register(i.visit(mc.MatchValue, context))
+		if res.Error != nil {
+			return res
+		}
+
+		if fmt.Sprint(matchVal) == fmt.Sprint(value) {
+			return res.success(res.register(i.visit(mc.Body, context)))
+		}
+	}
+
+	// Run default case if present
+	if node.Otherwise != nil {
+		return res.success(res.register(i.visit(node.Otherwise, context)))
+	}
+
+	return res.success(nil)
 }
 
 func (i *Interpreter) visitFetchJSONNode(node FetchJSONNode, context *Context) *RTResult {
