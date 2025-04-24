@@ -1829,10 +1829,15 @@ func (p *Parser) leap_expr() *ParseResult {
 	p.advance()
 
 	// Parse loop body
-	body := res.register(p.expr())
-	if res.Error != "" {
-		return res
+	statements := []interface{}{}
+	for p.Current_Tok.Type != TT_RCURLBR && p.Current_Tok.Type != TT_EOF {
+		stmt := res.register(p.expr())
+		if res.Error != "" {
+			return res
+		}
+		statements = append(statements, stmt)
 	}
+	body := StatementsNode{Statements: statements}
 
 	// Expect '}'
 	if p.Current_Tok.Type != TT_RCURLBR {
@@ -2554,12 +2559,28 @@ func (i *Interpreter) visitGrowlNode(node GrowlNode, context *Context) *RTResult
 		}
 
 		if condition.(bool) {
-			return res.success(res.register(i.visit(caseBlock.Body, context)))
+			// New child scope for the body
+			childCtx := &Context{
+				DisplayName:  "growl-block",
+				Parent:       context,
+				Symbol_Table: NewSymbolTable(),
+			}
+			childCtx.Symbol_Table.parent = context.Symbol_Table
+
+			return res.success(res.register(i.visit(caseBlock.Body, childCtx)))
 		}
 	}
 
 	if node.ElseCase != nil {
-		return res.success(res.register(i.visit(node.ElseCase, context)))
+		// New child scope for the else block
+		childCtx := &Context{
+			DisplayName:  "wag-block",
+			Parent:       context,
+			Symbol_Table: NewSymbolTable(),
+		}
+		childCtx.Symbol_Table.parent = context.Symbol_Table
+
+		return res.success(res.register(i.visit(node.ElseCase, childCtx)))
 	}
 
 	return res.success(nil)
@@ -2837,7 +2858,7 @@ func (i *Interpreter) visitPounceNode(node PounceNode, context *Context) *RTResu
 		}
 
 		// Ensure condition is boolean
-		condBool, ok := condResult.(bool) // FIX: No pointer
+		condBool, ok := condResult.(bool)
 		if !ok {
 			return res.failure(fmt.Errorf("Pounce condition must be a boolean, got %T", condResult))
 		}
@@ -2847,9 +2868,16 @@ func (i *Interpreter) visitPounceNode(node PounceNode, context *Context) *RTResu
 			break
 		}
 
-		// Execute loop body
+		// Scoped execution of loop body
 		for _, stmt := range node.Body {
-			res.register(i.visit(stmt, context))
+			childCtx := &Context{
+				DisplayName:  "pounce-block",
+				Parent:       context,
+				Symbol_Table: NewSymbolTable(),
+			}
+			childCtx.Symbol_Table.parent = context.Symbol_Table
+
+			res.register(i.visit(stmt, childCtx))
 			if res.Error != nil {
 				return res
 			}
@@ -2872,18 +2900,22 @@ func (i *Interpreter) visitLeapNode(node LeapNode, context *Context) *RTResult {
 		return res
 	}
 
-	// Ensure start and end values are numbers
 	start, ok1 := startResult.(float64)
-	end, ok2 := endResult.(float64)
-
+	endVal, ok2 := endResult.(float64)
 	if !ok1 || !ok2 {
 		return res.failure(fmt.Errorf("Expected numbers in leap range, got %T and %T", startResult, endResult))
 	}
 
-	for iter := int(start); iter < int(end); iter++ { // FIXED: Changed `i` to `iter`
-		context.Symbol_Table.set(node.VarName.Value, float64(iter))
+	for iter := int(start); iter < int(endVal); iter++ {
+		childCtx := &Context{
+			DisplayName:  "leap-iteration",
+			Parent:       context,
+			Symbol_Table: NewSymbolTable(),
+		}
+		childCtx.Symbol_Table.parent = context.Symbol_Table
+		childCtx.Symbol_Table.set(node.VarName.Value, float64(iter))
 
-		res.register(i.visit(node.Body, context)) // FIXED: i.visit works now!
+		res.register(i.visit(node.Body, childCtx))
 		if res.Error != nil {
 			return res
 		}

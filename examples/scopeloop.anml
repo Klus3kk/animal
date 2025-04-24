@@ -1,0 +1,6 @@
+leap i from 0 to 2 {
+  temp -> i meow 100
+  roar temp
+}
+
+roar temp  :: error
