@@ -1,0 +1,9 @@
+leap i from 0 to 5 {
+  growl i == 3 {
+    whimper
+  }
+  growl i == 1 {
+    hiss
+  }
+  roar i
+}

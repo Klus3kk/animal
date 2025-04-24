@@ -68,6 +68,7 @@ var KEYWORDS = []string{
 	"fetch", "drop", "drop_append", "sniff_file", // file i/o
 	"fetch_json", "fetch_csv", // Fetching json, csv
 	"mimic", "_", // mimic
+	"whimper", "hiss", // break, continue
 }
 
 // Token represents a token with its type and value
@@ -411,6 +412,10 @@ func (l *Lexer) make_boolean() Token {
 	}
 	return Token{}
 }
+
+// WHIMPER/HISS (break, continue)
+type WhimperNode struct{}
+type HissNode struct{}
 
 // MIMIC (switch)
 type MimicNode struct {
@@ -1637,6 +1642,15 @@ func (p *Parser) expr() *ParseResult {
 		return p.fetch_csv_expr()
 	}
 
+	if p.Current_Tok.matches(TT_KEY, "whimper") {
+		p.advance()
+		return res.success(WhimperNode{})
+	}
+	if p.Current_Tok.matches(TT_KEY, "hiss") {
+		p.advance()
+		return res.success(HissNode{})
+	}
+
 	// Handle variable access and assignment
 	// If next token is EQ (->), parse as assignment
 	if p.Current_Tok.Type == TT_IDEN && p.peek().Type == TT_EQ {
@@ -2050,6 +2064,10 @@ func (i *Interpreter) visit(node interface{}, context *Context) *RTResult {
 		return i.visitStatementsNode(node, context)
 	case MimicNode:
 		return i.visitMimicNode(node, context)
+	case WhimperNode:
+		return i.visitWhimperNode(node, context)
+	case HissNode:
+		return i.visitHissNode(node, context)
 	case SniffbackNode: // return node
 		val := i.visit(node.Value, context)
 		res := NewRTResult()
@@ -2507,6 +2525,10 @@ func (i *Interpreter) visitStatementsNode(node StatementsNode, context *Context)
 			return res.failure(result.Error)
 		}
 
+		// If it's a control signal, return it...
+		if result.Value == "__whimper__" || result.Value == "__hiss__" {
+			return res.success(result.Value)
+		}
 		// Only store the result if it's not sniffback or nil
 		if result.Value != nil {
 			lastValue = result.Value
@@ -2877,14 +2899,31 @@ func (i *Interpreter) visitPounceNode(node PounceNode, context *Context) *RTResu
 			}
 			childCtx.Symbol_Table.parent = context.Symbol_Table
 
-			res.register(i.visit(stmt, childCtx))
-			if res.Error != nil {
-				return res
+			result := i.visit(stmt, childCtx)
+			if result.Error != nil {
+				return result
 			}
+			if result.Value == "__whimper__" {
+				return res.success(nil) // break the loop
+			}
+			if result.Value == "__hiss__" {
+				break // skip rest of body
+			}
+
 		}
 	}
 
 	return res.success(nil)
+}
+
+func (i *Interpreter) visitWhimperNode(node WhimperNode, context *Context) *RTResult {
+	res := NewRTResult()
+	return res.success("__whimper__")
+}
+
+func (i *Interpreter) visitHissNode(node HissNode, context *Context) *RTResult {
+	res := NewRTResult()
+	return res.success("__hiss__")
 }
 
 func (i *Interpreter) visitLeapNode(node LeapNode, context *Context) *RTResult {
@@ -2915,9 +2954,15 @@ func (i *Interpreter) visitLeapNode(node LeapNode, context *Context) *RTResult {
 		childCtx.Symbol_Table.parent = context.Symbol_Table
 		childCtx.Symbol_Table.set(node.VarName.Value, float64(iter))
 
-		res.register(i.visit(node.Body, childCtx))
-		if res.Error != nil {
-			return res
+		result := i.visit(node.Body, childCtx)
+		if result.Error != nil {
+			return result
+		}
+		if result.Value == "__whimper__" {
+			break
+		}
+		if result.Value == "__hiss__" {
+			continue
 		}
 	}
 
