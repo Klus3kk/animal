@@ -1,0 +1,23 @@
+roar "Before try-catch test"
+
+*[
+  roar "Inside first try block"
+  *{ "first symbolic error" }*
+]*
+
+*(
+  roar "Caught symbolic error:" _error
+)*
+
+roar "After first try-catch"
+
+*[
+  roar "Inside second try block"
+  howl_fail "second symbolic error"
+]*
+
+*(
+  roar "Caught classic error:" _error
+)*
+
+roar "End of test"

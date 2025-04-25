@@ -21,39 +21,45 @@ const LETTERS_DIGITS string = LETTERS + DIGITS
 // TOKENS //
 
 const (
-	TT_INT      = "INT"    //
-	TT_FLOAT    = "FLOAT"  //
-	TT_BOOL     = "BOOL"   //
-	TT_STRING   = "STRING" //
-	TT_IDEN     = "IDENTIFIER"
-	TT_KEY      = "KEYWORD"
-	TT_PLUS     = "PLUS"  //
-	TT_MINUS    = "MINUS" //
-	TT_NEG      = "NEG"   //
-	TT_POS      = "POS"   //
-	TT_MUL      = "MUL"   //
-	TT_DIV      = "DIV"   //
-	TT_MOD      = "MOD"   //
-	TT_EXP      = "EXP"   //
-	TT_CONC     = "CONC"  //
-	TT_EQ       = "EQ"
-	TT_GT       = "GT"
-	TT_LT       = "LT"
-	TT_GTE      = "GTE"
-	TT_LTE      = "LTE"
-	TT_EQEQ     = "EQEQ"
-	TT_NEQ      = "NEQ"
-	TT_DOT      = "DOT"
-	TT_COMMA    = "COMMA"
-	TT_LROUNDBR = "LROUNDBR" //
-	TT_RROUNDBR = "RROUNDBR" //
-	TT_RSQRBR   = "RSQRBR"   //
-	TT_LSQRBR   = "LSQRBR"   //
-	TT_RCURLBR  = "RCURLBR"  //
-	TT_LCURLBR  = "LCURLBR"  //
-	TT_EOF      = "EOF"      //
-	TT_AND      = "AND"
-	TT_OR       = "OR"
+	TT_INT         = "INT"    //
+	TT_FLOAT       = "FLOAT"  //
+	TT_BOOL        = "BOOL"   //
+	TT_STRING      = "STRING" //
+	TT_IDEN        = "IDENTIFIER"
+	TT_KEY         = "KEYWORD"
+	TT_PLUS        = "PLUS"  //
+	TT_MINUS       = "MINUS" //
+	TT_NEG         = "NEG"   //
+	TT_POS         = "POS"   //
+	TT_MUL         = "MUL"   //
+	TT_DIV         = "DIV"   //
+	TT_MOD         = "MOD"   //
+	TT_EXP         = "EXP"   //
+	TT_CONC        = "CONC"  //
+	TT_EQ          = "EQ"
+	TT_GT          = "GT"
+	TT_LT          = "LT"
+	TT_GTE         = "GTE"
+	TT_LTE         = "LTE"
+	TT_EQEQ        = "EQEQ"
+	TT_NEQ         = "NEQ"
+	TT_DOT         = "DOT"
+	TT_COMMA       = "COMMA"
+	TT_LROUNDBR    = "LROUNDBR" //
+	TT_RROUNDBR    = "RROUNDBR" //
+	TT_RSQRBR      = "RSQRBR"   //
+	TT_LSQRBR      = "LSQRBR"   //
+	TT_RCURLBR     = "RCURLBR"  //
+	TT_LCURLBR     = "LCURLBR"  //
+	TT_EOF         = "EOF"      //
+	TT_AND         = "AND"
+	TT_OR          = "OR"
+	TT_TRY_START   = "TT_TRY_START"
+	TT_TRY_END     = "TT_TRY_END"
+	TT_CATCH_START = "TT_CATCH_START"
+	TT_CATCH_END   = "TT_CATCH_END"
+	TT_THROW_START = "TT_THROW_START"
+	TT_THROW_END   = "TT_THROW_END"
 )
 
 var KEYWORDS = []string{
@@ -196,21 +202,56 @@ func (l *Lexer) make_tokens() ([]Token, error) {
 			l.advanceBy(2)
 			posEnd := l.Pos.copy()
 			tokens = append(tokens, Token{Type: TT_EQ, Value: "EQ", Pos_Start: posStart, Pos_End: posEnd})
-		} else if l.CurrentChar == '(' {
-			posStart := l.Pos.copy()
-			l.advance()
-			posEnd := l.Pos.copy()
-			tokens = append(tokens, Token{Type: TT_LROUNDBR, Value: string(l.CurrentChar), Pos_Start: posStart, Pos_End: posEnd})
 		} else if l.CurrentChar == '.' {
 			posStart := l.Pos.copy()
 			l.advance()
 			posEnd := l.Pos.copy()
 			tokens = append(tokens, Token{Type: TT_DOT, Value: ".", Pos_Start: posStart, Pos_End: posEnd})
+		} else if l.peek(2) == "*{" {
+			posStart := l.Pos.copy()
+			l.advanceBy(2)
+			posEnd := l.Pos.copy()
+			tokens = append(tokens, Token{Type: "TT_THROW_START", Value: "*{", Pos_Start: posStart, Pos_End: posEnd})
+		} else if l.peek(2) == "}*" {
+			posStart := l.Pos.copy()
+			l.advanceBy(2)
+			posEnd := l.Pos.copy()
+			tokens = append(tokens, Token{Type: "TT_THROW_END", Value: "}*", Pos_Start: posStart, Pos_End: posEnd})
+		} else if l.peek(2) == "*[" {
+			posStart := l.Pos.copy()
+			l.advanceBy(2)
+			posEnd := l.Pos.copy()
+			tokens = append(tokens, Token{Type: "TT_TRY_START", Value: "*[", Pos_Start: posStart, Pos_End: posEnd})
+		} else if l.peek(2) == "]*" {
+			posStart := l.Pos.copy()
+			l.advanceBy(2)
+			posEnd := l.Pos.copy()
+			tokens = append(tokens, Token{Type: "TT_TRY_END", Value: "]*", Pos_Start: posStart, Pos_End: posEnd})
+		} else if l.peek(2) == "*(" {
+			posStart := l.Pos.copy()
+			l.advanceBy(2)
+			posEnd := l.Pos.copy()
+			tokens = append(tokens, Token{Type: "TT_CATCH_START", Value: "*(", Pos_Start: posStart, Pos_End: posEnd})
+		} else if l.peek(2) == ")*" {
+			posStart := l.Pos.copy()
+			l.advanceBy(2)
+			posEnd := l.Pos.copy()
+			tokens = append(tokens, Token{Type: "TT_CATCH_END", Value: ")*", Pos_Start: posStart, Pos_End: posEnd})
+		} else if l.CurrentChar == '*' {
+			posStart := l.Pos.copy()
+			l.advance()
+			err = fmt.Errorf("%s: Unexpected standalone '*' - did you mean '*[', '*{', etc.?", posStart.asString())
+			break
 		} else if l.CurrentChar == ')' {
 			posStart := l.Pos.copy()
 			l.advance()
 			posEnd := l.Pos.copy()
 			tokens = append(tokens, Token{Type: TT_RROUNDBR, Value: string(l.CurrentChar), Pos_Start: posStart, Pos_End: posEnd})
+		} else if l.CurrentChar == '(' {
+			posStart := l.Pos.copy()
+			l.advance()
+			posEnd := l.Pos.copy()
+			tokens = append(tokens, Token{Type: TT_LROUNDBR, Value: string(l.CurrentChar), Pos_Start: posStart, Pos_End: posEnd})
 		} else if l.CurrentChar == '[' {
 			posStart := l.Pos.copy()
 			l.advance()
@@ -411,6 +452,17 @@ func (l *Lexer) make_boolean() Token {
 		return Token{Type: TT_BOOL, Value: "false", Pos_Start: posStart, Pos_End: l.Pos.copy()}
 	}
 	return Token{}
+}
+
+// TRY/CATCH/THROW
+type TrySymbolicNode struct {
+	TryBody   interface{}
+	CatchBody interface{}
+	ErrorName string
+}
+
+type ThrowSymbolicNode struct {
+	ErrorValue interface{}
 }
 
 // WHIMPER/HISS (break, continue)
@@ -1321,7 +1373,7 @@ func (p *Parser) parse() *ParseResult {
 	for p.Current_Tok.Type != TT_EOF {
 		fmt.Println("Parsing statement, current token:", p.Current_Tok)
 
-		stmt := res.register(p.expr())
+		stmt := res.register(p.statement())
 		if res.Error != "" {
 			return res
 		}
@@ -1438,10 +1490,21 @@ func (p *Parser) atom() *ParseResult {
 	res := &ParseResult{}
 	tok := p.Current_Tok
 
+	// Protect against block markers appearing inside expressions
+	//if p.Current_Tok.Type == TT_TRY_START ||
+	//	p.Current_Tok.Type == TT_TRY_END ||
+	//	p.Current_Tok.Type == TT_CATCH_START ||
+	//	p.Current_Tok.Type == TT_CATCH_END ||
+	//	p.Current_Tok.Type == TT_THROW_START ||
+	//	p.Current_Tok.Type == TT_THROW_END {
+	//	return res.failure("Unexpected block marker in expression")
+	//}
+
 	if p.Current_Tok.Type == TT_EOF {
 		return res.failure("Unexpected end of file")
 	}
 
+	// Handle special case keywords like roar, growl, etc.
 	if tok.Type == TT_KEY {
 		return p.expr()
 	}
@@ -1550,7 +1613,7 @@ func (p *Parser) atom() *ParseResult {
 			return res
 		}
 		if p.Current_Tok.Type != TT_RCURLBR {
-			return res.failure("Expected '}'")
+			return res.failure("Expected '}' after expression")
 		}
 		p.advance()
 		return p.parseDotCalls(expr)
@@ -1582,9 +1645,28 @@ func (p *Parser) term() *ParseResult {
 	return p.bin_op(p.factor, []string{TT_MUL, TT_DIV, TT_MOD, TT_CONC, TT_PLUS, TT_MINUS})
 }
 
+func (p *Parser) statement() *ParseResult {
+	// Handle block-level statements first
+	if p.Current_Tok.Type == TT_TRY_START {
+		return p.try_symbolic_expr()
+	}
+	if p.Current_Tok.Type == TT_THROW_START {
+		return p.throw_symbolic_expr()
+	}
+
+	// Otherwise, fallback to normal expr (which includes roar, growl, fetch, drop, etc.)
+	return p.expr()
+}
+
 // Modified expr function to handle variable assignments with types and operations
 func (p *Parser) expr() *ParseResult {
 	res := &ParseResult{}
+	if p.Current_Tok.Type == TT_TRY_START {
+		return p.try_symbolic_expr()
+	}
+	if p.Current_Tok.Type == TT_THROW_START {
+		return p.throw_symbolic_expr()
+	}
 
 	// Print statement
 	if p.Current_Tok.matches(TT_KEY, "roar") {
@@ -1651,6 +1733,10 @@ func (p *Parser) expr() *ParseResult {
 		return res.success(HissNode{})
 	}
 
+	if p.Current_Tok.matches(TT_KEY, "howl_fail") {
+		return p.howl_fail_expr()
+	}
+
 	// Handle variable access and assignment
 	// If next token is EQ (->), parse as assignment
 	if p.Current_Tok.Type == TT_IDEN && p.peek().Type == TT_EQ {
@@ -1706,6 +1792,140 @@ func (p *Parser) expr() *ParseResult {
 
 	return res.success(node)
 
+}
+
+func (p *Parser) howl_fail_expr() *ParseResult {
+	res := &ParseResult{}
+
+	if !p.Current_Tok.matches(TT_KEY, "howl_fail") {
+		return res.failure("Expected 'howl_fail'")
+	}
+	p.advance()
+
+	msg := res.register(p.expr())
+	if res.Error != "" {
+		return res
+	}
+
+	return res.success(ThrowSymbolicNode{ErrorValue: msg})
+}
+
+func (p *Parser) try_symbolic_expr() *ParseResult {
+	res := &ParseResult{}
+
+	if p.Current_Tok.Type != TT_TRY_START {
+		return res.failure("Expected '*[' to begin try block")
+	}
+	p.advance()
+
+	for p.Current_Tok.Type == TT_EOF || (p.Current_Tok.Type == TT_KEY && p.Current_Tok.Value == "") {
+		p.advance()
+	}
+	// COLLECT MULTIPLE STATEMENTS
+	statements := []interface{}{}
+	for p.Current_Tok.Type != TT_TRY_END && p.Current_Tok.Type != TT_EOF {
+		stmt := res.register(p.statement())
+		if res.Error != "" {
+			return res
+		}
+		if stmt != nil { // <<< only append non-nil
+			statements = append(statements, stmt)
+		}
+	}
+
+	tryBody := StatementsNode{Statements: statements}
+
+	if p.Current_Tok.Type != TT_TRY_END {
+		return res.failure("Expected ']*' to close try block")
+	}
+	p.advance()
+
+	if p.Current_Tok.Type != TT_CATCH_START {
+		return res.failure("Expected '*(' to begin catch block")
+	}
+	p.advance()
+
+	// NO errorName support, always default to "_error"
+	errorName := "_error"
+
+	// 🛠 COLLECT MULTIPLE STATEMENTS IN CATCH TOO
+	catchStatements := []interface{}{}
+	for p.Current_Tok.Type != TT_CATCH_END && p.Current_Tok.Type != TT_EOF {
+		stmt := res.register(p.statement())
+		if res.Error != "" {
+			return res
+		}
+		if stmt != nil { // <<< only append non-nil
+			catchStatements = append(catchStatements, stmt)
+		}
+	}
+
+	catchBody := StatementsNode{Statements: catchStatements}
+
+	if p.Current_Tok.Type != TT_CATCH_END {
+		return res.failure("Expected ')*' to close catch block")
+	}
+	p.advance()
+
+	return res.success(TrySymbolicNode{
+		TryBody:   tryBody,
+		CatchBody: catchBody,
+		ErrorName: errorName,
+	})
+}
+
+func (p *Parser) throw_symbolic_expr() *ParseResult {
+	res := &ParseResult{}
+
+	if p.Current_Tok.Type != "TT_THROW_START" {
+		return res.failure("Expected '*{' to begin throw block")
+	}
+	p.advance()
+
+	expr := res.register(p.expr())
+	if res.Error != "" {
+		return res
+	}
+
+	if p.Current_Tok.Type != "TT_THROW_END" {
+		return res.failure("Expected '}*' to close throw block")
+	}
+	p.advance()
+
+	return res.success(ThrowSymbolicNode{ErrorValue: expr})
+}
+
+func (i *Interpreter) visitTrySymbolicNode(node TrySymbolicNode, context *Context) *RTResult {
+	res := NewRTResult()
+
+	tryRes := i.visit(node.TryBody, context)
+	if tryRes.Error == nil {
+		return tryRes
+	}
+
+	// Create a new child context for the catch block
+	catchCtx := &Context{
+		DisplayName:  "catch-block",
+		Parent:       context,
+		Symbol_Table: NewSymbolTable(),
+	}
+	catchCtx.Symbol_Table.parent = context.Symbol_Table
+	catchCtx.Symbol_Table.set(node.ErrorName, tryRes.Error.Error())
+
+	catchVal := i.visit(node.CatchBody, catchCtx)
+	if catchVal.Error != nil {
+		return catchVal
+	}
+	return res.success(catchVal.Value)
+}
+
+func (i *Interpreter) visitThrowSymbolicNode(node ThrowSymbolicNode, context *Context) *RTResult {
+	res := NewRTResult()
+	errVal := res.register(i.visit(node.ErrorValue, context))
+	if res.Error != nil {
+		return res
+	}
+	return res.failure(fmt.Errorf("%v", errVal)) // Throw the error
 }
 
 func (p *Parser) pounce_expr() *ParseResult {
@@ -2020,6 +2240,10 @@ func (i *Interpreter) visit(node interface{}, context *Context) *RTResult {
 		return i.visitNestDefNode(node, context)
 	case ListNode:
 		return i.visitListNode(node, context)
+	case ThrowSymbolicNode:
+		return i.visitThrowSymbolicNode(node, context)
+	case TrySymbolicNode:
+		return i.visitTrySymbolicNode(node, context)
 	case ListAccessNode:
 		return i.visitListAccessNode(node, context)
 	case FunctionCallNode:
