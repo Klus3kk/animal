@@ -1,0 +1,13 @@
+!shelter -> ["add", "multiply"]
+
+howl add(a, b) {
+    a meow b sniffback
+}
+
+howl multiply(a, b) {
+    a moo b sniffback
+}
+
+howl internal_secret(x) {   :: hidden, not exported
+    x meow 1000 sniffback
+}

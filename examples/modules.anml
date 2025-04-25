@@ -1,0 +1,8 @@
+%bestiary 'examples/math_utils.anml'
+
+x -> add(2, 3)
+y -> multiply(x, 2)
+roar x
+roar y
+
+internal_secret(5) :: ERROR! not visible

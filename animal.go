@@ -12,11 +12,13 @@ import (
 	"time"
 )
 
-// CONSTANTS //
+// CONSTANTS AND VARIABLES //
 
 const DIGITS string = "0123456789"
 const LETTERS string = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 const LETTERS_DIGITS string = LETTERS + DIGITS
+
+var importedFiles = map[string]bool{}
 
 // TOKENS //
 
@@ -146,7 +148,7 @@ func (l *Lexer) make_tokens() ([]Token, error) {
 			l.advance()
 		} else if strings.IndexByte(DIGITS, l.CurrentChar) != -1 {
 			tokens = append(tokens, l.make_number()) // Tokenize number
-		} else if l.CurrentChar == '"' {
+		} else if l.CurrentChar == '"' || l.CurrentChar == '\'' {
 			tokens = append(tokens, l.make_string()) // Tokenize string
 		} else if l.peek(4) == "true" || l.peek(5) == "false" {
 			tokens = append(tokens, l.make_boolean()) // Tokenize boolean
@@ -155,6 +157,16 @@ func (l *Lexer) make_tokens() ([]Token, error) {
 			l.advanceBy(4)
 			posEnd := l.Pos.copy() // After advancing, copy for the token's end
 			tokens = append(tokens, Token{Type: TT_PLUS, Value: "PLUS", Pos_Start: posStart, Pos_End: posEnd})
+		} else if l.peek(9) == "%bestiary" {
+			posStart := l.Pos.copy()
+			l.advanceBy(9)
+			posEnd := l.Pos.copy()
+			tokens = append(tokens, Token{Type: TT_KEY, Value: "%bestiary", Pos_Start: posStart, Pos_End: posEnd})
+		} else if l.peek(8) == "!shelter" {
+			posStart := l.Pos.copy()
+			l.advanceBy(8)
+			posEnd := l.Pos.copy()
+			tokens = append(tokens, Token{Type: TT_KEY, Value: "!shelter", Pos_Start: posStart, Pos_End: posEnd})
 		} else if l.peek(4) == "woof" {
 			posStart := l.Pos.copy()
 			l.advanceBy(4)
@@ -425,6 +437,7 @@ func (l *Lexer) make_number() Token {
 // Make a string token
 func (l *Lexer) make_string() Token {
 	posStart := l.Pos.copy()
+	quoteChar := l.CurrentChar
 	l.advance() // Skip opening quote
 	strVal := ""
 
@@ -432,7 +445,7 @@ func (l *Lexer) make_string() Token {
 	//strVal = strings.ReplaceAll(strVal, `\t`, "\t")
 	//strVal = strings.ReplaceAll(strVal, `\\`, `\`)
 
-	for l.CurrentChar != 0 && l.CurrentChar != '"' {
+	for l.CurrentChar != 0 && l.CurrentChar != quoteChar {
 		strVal += string(l.CurrentChar)
 		l.advance()
 	}
@@ -452,6 +465,15 @@ func (l *Lexer) make_boolean() Token {
 		return Token{Type: TT_BOOL, Value: "false", Pos_Start: posStart, Pos_End: l.Pos.copy()}
 	}
 	return Token{}
+}
+
+// MODULES
+type BestiaryNode struct {
+	Filename interface{}
+}
+
+type ShelterNode struct {
+	Symbols interface{}
 }
 
 // TRY/CATCH/THROW
@@ -1668,6 +1690,14 @@ func (p *Parser) expr() *ParseResult {
 		return p.throw_symbolic_expr()
 	}
 
+	if p.Current_Tok.matches(TT_KEY, "%bestiary") {
+		return p.bestiary_expr()
+	}
+
+	if p.Current_Tok.matches(TT_KEY, "!shelter") {
+		return p.shelter_expr()
+	}
+
 	// Print statement
 	if p.Current_Tok.matches(TT_KEY, "roar") {
 		return p.roar_expr()
@@ -1794,6 +1824,45 @@ func (p *Parser) expr() *ParseResult {
 
 }
 
+func (p *Parser) shelter_expr() *ParseResult {
+	res := &ParseResult{}
+
+	if !p.Current_Tok.matches(TT_KEY, "!shelter") {
+		return res.failure("Expected '!shelter'")
+	}
+	p.advance()
+
+	if p.Current_Tok.Type != TT_EQ {
+		return res.failure("Expected '->' after '!shelter'")
+	}
+	p.advance()
+
+	shelterList := res.register(p.expr())
+	if res.Error != "" {
+		return res
+	}
+
+	return res.success(ShelterNode{Symbols: shelterList})
+}
+
+func (p *Parser) bestiary_expr() *ParseResult {
+	res := &ParseResult{}
+
+	if !p.Current_Tok.matches(TT_KEY, "%bestiary") {
+		return res.failure("Expected '%bestiary'")
+	}
+	p.advance()
+
+	if p.Current_Tok.Type != TT_STRING {
+		return res.failure("Expected filename as string after %bestiary")
+	}
+
+	filename := StringNode{Tok: p.Current_Tok}
+	p.advance()
+
+	return res.success(BestiaryNode{Filename: filename})
+}
+
 func (p *Parser) howl_fail_expr() *ParseResult {
 	res := &ParseResult{}
 
@@ -1893,6 +1962,54 @@ func (p *Parser) throw_symbolic_expr() *ParseResult {
 	p.advance()
 
 	return res.success(ThrowSymbolicNode{ErrorValue: expr})
+}
+
+func (i *Interpreter) visitBestiaryNode(node BestiaryNode, context *Context) *RTResult {
+	res := NewRTResult()
+
+	filenameVal := res.register(i.visit(node.Filename, context))
+	if res.Error != nil {
+		return res
+	}
+
+	filename, ok := filenameVal.(string)
+	if !ok {
+		return res.failure(fmt.Errorf("%bestiary expects a string filename"))
+	}
+
+	if importedFiles[filename] {
+		return res.success(nil) // Already imported
+	}
+	importedFiles[filename] = true
+
+	data, err := os.ReadFile(filename)
+	if err != nil {
+		return res.failure(fmt.Errorf("Failed to read bestiary file: %v", err))
+	}
+
+	code := string(data)
+
+	_, err = customRun(code, filename, context)
+	if err != nil {
+		return res.failure(fmt.Errorf("Error running bestiary file: %v", err))
+	}
+	shelterRaw := context.Symbol_Table.get("__shelter__")
+	if shelterRaw != nil {
+		if shelterList, ok := shelterRaw.([]interface{}); ok {
+			newSymbols := make(map[string]interface{})
+			for _, name := range shelterList {
+				if strName, ok := name.(string); ok {
+					val := context.Symbol_Table.get(strName)
+					if val != nil {
+						newSymbols[strName] = val
+					}
+				}
+			}
+			context.Symbol_Table.symbols = newSymbols
+		}
+	}
+
+	return res.success(nil)
 }
 
 func (i *Interpreter) visitTrySymbolicNode(node TrySymbolicNode, context *Context) *RTResult {
@@ -2232,6 +2349,10 @@ type Interpreter struct{}
 
 func (i *Interpreter) visit(node interface{}, context *Context) *RTResult {
 	switch node := node.(type) {
+	case BestiaryNode:
+		return i.visitBestiaryNode(node, context)
+	case ShelterNode:
+		return i.visitShelterNode(node, context)
 	case FunctionDefNode:
 		return i.visitFunctionDefNode(node, context)
 	case DotCallNode:
@@ -2303,6 +2424,18 @@ func (i *Interpreter) visit(node interface{}, context *Context) *RTResult {
 		res := NewRTResult()
 		return res.failure(fmt.Errorf("No visit method for node type %T", node))
 	}
+}
+
+func (i *Interpreter) visitShelterNode(node ShelterNode, context *Context) *RTResult {
+	res := NewRTResult()
+
+	shelterList := res.register(i.visit(node.Symbols, context))
+	if res.Error != nil {
+		return res
+	}
+
+	context.Symbol_Table.set("__shelter__", shelterList)
+	return res.success(nil)
 }
 
 func (i *Interpreter) visitMimicNode(node MimicNode, context *Context) *RTResult {
