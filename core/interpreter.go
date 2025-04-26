@@ -784,7 +784,24 @@ func (i *Interpreter) visitFunctionCallNode(node FunctionCallNode, context *Cont
 		return res.success(instance)
 	}
 
-	// 🐾 Otherwise, it's a normal function
+	// If it's a Go native standard library function
+	if nativeFn, isNative := fnVal.(func([]interface{}) interface{}); isNative {
+		args := []interface{}{}
+		for _, argNode := range node.Args {
+			arg := res.register(i.visit(argNode, context))
+			if res.Error != nil {
+				return res
+			}
+			args = append(args, arg)
+		}
+		result := nativeFn(args)
+		if err, isErr := result.(error); isErr {
+			return res.failure(err)
+		}
+		return res.success(result)
+	}
+
+	// Otherwise, it's a normal Animal function
 	fnNode, ok := fnVal.(FunctionDefNode)
 	if !ok {
 		return res.failure(fmt.Errorf("'%s' is not a function or nest", node.FuncName))
