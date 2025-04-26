@@ -1016,29 +1016,39 @@ func (p *Parser) expr() *ParseResult {
 		return p.howl_fail_expr()
 	}
 
-	// Handle variable access and assignment
-	// If next token is EQ (->), parse as assignment
-	if p.Current_Tok.Type == TT_IDEN && p.peek().Type == TT_EQ {
-		target := res.register(p.atom())
-		if res.Error != "" {
-			return res
+	// Handle variable access and assignment (with optional type hint)
+	if p.Current_Tok.Type == TT_IDEN && (p.peek().Type == TT_COLON || p.peek().Type == TT_EQ) {
+		varName := p.Current_Tok
+		p.advance()
+
+		var typeName *Token = nil
+
+		if p.Current_Tok.Type == TT_COLON {
+			p.advance()
+
+			if p.Current_Tok.Type != TT_IDEN && p.Current_Tok.Type != TT_KEY {
+				return res.failure("Expected type name after ':'")
+			}
+			tmp := p.Current_Tok
+			typeName = &tmp
+			p.advance()
 		}
 
-		p.advance() // consume ->
+		if p.Current_Tok.Type != TT_EQ {
+			return res.failure("Expected '->' after variable name (and optional type)")
+		}
+		p.advance()
+
 		value_expr := res.register(p.expr())
 		if res.Error != "" {
 			return res
 		}
 
-		if dotNode, ok := target.(DotCallNode); ok {
-			dotNode.Args = []interface{}{value_expr}
-			return res.success(dotNode)
-		}
-		if varNode, ok := target.(VarAccessNode); ok {
-			return res.success(VarAssignNode{Var_Name_Tok: varNode.Var_Name_Tok, Value_Node: value_expr})
-		}
-
-		return res.failure("Invalid assignment target")
+		return res.success(VarAssignNode{
+			Var_Name_Tok: varName,
+			TypeName:     typeName,
+			Value_Node:   value_expr,
+		})
 	}
 
 	// Else parse the full binary expression

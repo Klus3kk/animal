@@ -2,53 +2,58 @@ package core
 
 import "fmt"
 
-// SYMBOL TABLE
+// SYMBOL and SYMBOL TABLE
+
+type Symbol struct {
+	Value interface{}
+	Type  string // "" means dynamic (no type enforced)
+}
+
 type SymbolTable struct {
-	symbols map[string]interface{} // Dictionary to store symbols
-	parent  *SymbolTable           // Pointer to parent symbol table
+	symbols map[string]Symbol
+	parent  *SymbolTable
 }
 
 func NewSymbolTable() *SymbolTable {
 	return &SymbolTable{
-		symbols: make(map[string]interface{}), // Initialize symbols map
+		symbols: make(map[string]Symbol),
 		parent:  nil,
 	}
 }
 
-// Set a value in the symbol table
+// Set a value dynamically (no type enforced)
 func (s *SymbolTable) Set(name string, value interface{}) {
 	if name == "" {
 		fmt.Println("Error: Variable name cannot be empty")
 		return
 	}
-	if Debug {
-		fmt.Printf("Setting variable %s to %v in context\n", name, value)
-	}
-	s.symbols[name] = value
+	s.symbols[name] = Symbol{Value: value, Type: ""}
 }
 
-// Get a value from the symbol table
-func (s *SymbolTable) get(name string) interface{} {
+// Set a value with a given type
+func (s *SymbolTable) SetWithType(name string, value interface{}, typeName string) {
 	if name == "" {
 		fmt.Println("Error: Variable name cannot be empty")
-		return nil
+		return
 	}
-	if value, exists := s.symbols[name]; exists {
-		if Debug {
-			fmt.Printf("Getting variable %s with value %v from context\n", name, value)
-		}
-		return value
-	} else if s.parent != nil {
-		if Debug {
-			fmt.Printf("Looking up variable %s in parent context\n", name)
-		}
-		return s.parent.get(name)
-	}
-	fmt.Printf("Variable %s not found\n", name) // Added debug
-	return nil
+	s.symbols[name] = Symbol{Value: value, Type: typeName}
 }
 
-// Remove a symbol from the table
+// Get retrieves the symbol (value + type)
+func (s *SymbolTable) get(name string) (Symbol, bool) {
+	if name == "" {
+		fmt.Println("Error: Variable name cannot be empty")
+		return Symbol{}, false
+	}
+	if value, exists := s.symbols[name]; exists {
+		return value, true
+	} else if s.parent != nil {
+		return s.parent.get(name)
+	}
+	return Symbol{}, false
+}
+
+// Remove deletes a symbol
 func (s *SymbolTable) remove(name string) {
 	delete(s.symbols, name)
 }

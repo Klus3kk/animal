@@ -27,6 +27,7 @@ const (
 	TT_MOD         = "MOD"   //
 	TT_EXP         = "EXP"   //
 	TT_CONC        = "CONC"  //
+	TT_COLON       = "COLON"
 	TT_EQ          = "EQ"
 	TT_GT          = "GT"
 	TT_LT          = "LT"
@@ -50,7 +51,7 @@ const (
 	TT_CATCH_START = "TT_CATCH_START"
 	TT_CATCH_END   = "TT_CATCH_END"
 	TT_THROW_START = "TT_THROW_START"
-	TT_THROW_END   = "TT_THROW_END"
+	//TT_THROW_END   = "TT_THROW_END"
 )
 
 var KEYWORDS = []string{

@@ -658,20 +658,21 @@ func (i *Interpreter) visitGrowlNode(node GrowlNode, context *Context) *RTResult
 func (i *Interpreter) visitVarAccessNode(node VarAccessNode, context *Context) *RTResult {
 	res := NewRTResult()
 	varName := node.Var_Name_Tok.Value
-	value := context.Symbol_Table.get(varName)
-	// Debug
-	// fmt.Printf("Looking for variable: %s in context\n", varName)
-	// fmt.Printf("Available variables: %v\n", context.Symbol_Table.symbols)
-
-	if value == nil {
+	symbol, ok := context.Symbol_Table.get(varName)
+	if !ok {
 		return res.failure(fmt.Errorf("'%s' is not defined", varName))
 	}
-	return res.success(value)
+	if Debug {
+		fmt.Printf("Looking for variable: %s in context\n", varName)
+		fmt.Printf("Available variables: %v\n", context.Symbol_Table.symbols)
+	}
+	return res.success(symbol.Value)
 }
 
 func (i *Interpreter) visitVarAssignNode(node VarAssignNode, context *Context) *RTResult {
 	res := NewRTResult()
 	varName := node.Var_Name_Tok.Value
+
 	value := res.register(i.visit(node.Value_Node, context))
 	if res.Error != nil {
 		return res
@@ -681,8 +682,56 @@ func (i *Interpreter) visitVarAssignNode(node VarAssignNode, context *Context) *
 		fmt.Printf("Assigning variable: %s -> %v\n", varName, value)
 	}
 
+	existingSymbol, exists := context.Symbol_Table.get(varName)
+
+	// 1. If this assignment has an explicit type (like x: int -> 5)
+	if node.TypeName != nil {
+		typeHint := node.TypeName.Value
+
+		if !i.checkType(typeHint, value) {
+			return res.failure(fmt.Errorf("Type mismatch: expected %s, got %T", typeHint, value))
+		}
+
+		context.Symbol_Table.SetWithType(varName, value, typeHint)
+		return res.success(value)
+	}
+
+	// 2. If reassigning an existing variable that has a type
+	if exists && existingSymbol.Type != "" {
+		if !i.checkType(existingSymbol.Type, value) {
+			return res.failure(fmt.Errorf("Type mismatch: expected %s, got %T", existingSymbol.Type, value))
+		}
+
+		context.Symbol_Table.SetWithType(varName, value, existingSymbol.Type)
+		return res.success(value)
+	}
+
+	// 3. Otherwise, dynamic assignment
 	context.Symbol_Table.Set(varName, value)
 	return res.success(value)
+}
+
+func (i *Interpreter) checkType(expectedType string, value interface{}) bool {
+	switch expectedType {
+	case "int":
+		_, ok := value.(float64)
+		return ok
+	case "float":
+		_, ok := value.(float64)
+		return ok
+	case "bool":
+		_, ok := value.(bool)
+		return ok
+	case "string":
+		_, ok := value.(string)
+		return ok
+	case "list":
+		_, ok := value.([]interface{})
+		return ok
+	default:
+		// Unknown type hint, assume OK
+		return true
+	}
 }
 
 func (i *Interpreter) visitListenNode(node ListenNode, context *Context) *RTResult {
@@ -706,7 +755,11 @@ func (i *Interpreter) visitFunctionDefNode(node FunctionDefNode, context *Contex
 func (i *Interpreter) visitFunctionCallNode(node FunctionCallNode, context *Context) *RTResult {
 	res := NewRTResult()
 
-	fnVal := context.Symbol_Table.get(node.FuncName)
+	symbol, ok := context.Symbol_Table.get(node.FuncName)
+	if !ok {
+		return res.failure(fmt.Errorf("Function or nest '%s' is not defined", node.FuncName))
+	}
+	fnVal := symbol.Value
 	if fnVal == nil {
 		return res.failure(fmt.Errorf("Function or nest '%s' is not defined", node.FuncName))
 	}
@@ -1046,20 +1099,22 @@ func (i *Interpreter) visitBestiaryNode(node BestiaryNode, context *Context) *RT
 	if err != nil {
 		return res.failure(fmt.Errorf("Error running bestiary file: %v", err))
 	}
-	shelterRaw := context.Symbol_Table.get("__shelter__")
-	if shelterRaw != nil {
-		if shelterList, ok := shelterRaw.([]interface{}); ok {
-			newSymbols := make(map[string]interface{})
-			for _, name := range shelterList {
-				if strName, ok := name.(string); ok {
-					val := context.Symbol_Table.get(strName)
-					if val != nil {
-						newSymbols[strName] = val
-					}
+	symbol, ok := context.Symbol_Table.get("__shelter__")
+	if !ok {
+		return res.success(nil) // No shelter found, fine
+	}
+	shelterRaw := symbol.Value
+	if shelterList, ok := shelterRaw.([]interface{}); ok {
+		newSymbols := make(map[string]Symbol)
+		for _, name := range shelterList {
+			if strName, ok := name.(string); ok {
+				sym, exists := context.Symbol_Table.get(strName)
+				if exists {
+					newSymbols[strName] = sym
 				}
 			}
-			context.Symbol_Table.symbols = newSymbols
 		}
+		context.Symbol_Table.symbols = newSymbols
 	}
 
 	return res.success(nil)

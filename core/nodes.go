@@ -157,6 +157,7 @@ type VarAccessNode struct {
 
 type VarAssignNode struct {
 	Var_Name_Tok Token
+	TypeName     *Token
 	Value_Node   interface{}
 }
 

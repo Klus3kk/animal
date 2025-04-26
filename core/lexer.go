@@ -261,6 +261,11 @@ func (l *Lexer) make_tokens() ([]Token, error) {
 			for l.CurrentChar != 0 && l.CurrentChar != '\n' {
 				l.advance() // Skip until end of line
 			}
+		} else if l.CurrentChar == ':' {
+			posStart := l.Pos.copy()
+			l.advance()
+			posEnd := l.Pos.copy()
+			tokens = append(tokens, Token{Type: TT_COLON, Value: ":", Pos_Start: posStart, Pos_End: posEnd})
 		} else {
 			posStart := l.Pos.copy()
 			char := string(l.CurrentChar)
