@@ -7,7 +7,7 @@ The goal of this project is to create a new programming language with unique fea
 To build the Animal interpreter:
 
 ```bash
-go build -o animal animal.go shell.go
+go build -o animal.exe ./cmd/animal
 ```
 
 This will create a binary called `animal`.
