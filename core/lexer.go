@@ -74,6 +74,11 @@ func (l *Lexer) make_tokens() ([]Token, error) {
 			l.advanceBy(6)
 			posEnd := l.Pos.copy()
 			tokens = append(tokens, Token{Type: TT_KEY, Value: "%debug", Pos_Start: posStart, Pos_End: posEnd})
+		} else if l.peek(5) == "%time" {
+			posStart := l.Pos.copy()
+			l.advanceBy(5)
+			posEnd := l.Pos.copy()
+			tokens = append(tokens, Token{Type: TT_KEY, Value: "%time", Pos_Start: posStart, Pos_End: posEnd})
 		} else if l.peek(8) == "!shelter" {
 			posStart := l.Pos.copy()
 			l.advanceBy(8)

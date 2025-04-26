@@ -8,6 +8,7 @@ const LETTERS_DIGITS string = LETTERS + DIGITS
 
 var importedFiles = map[string]bool{}
 var Debug = false
+var TimeEnabled = false
 
 // TOKENS //
 

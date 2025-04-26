@@ -241,6 +241,10 @@ type DebugNode struct {
 	Value interface{}
 }
 
+type TimeNode struct {
+	Value interface{}
+}
+
 // STRING OUTPUTS
 
 func (n SniffbackNode) String() string {

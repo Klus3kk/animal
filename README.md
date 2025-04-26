@@ -24,6 +24,16 @@ To launch the interactive REPL:
 ./animal
 ```
 
+OR, if you want to install it:
+```bash
+go install ./cmd/animal
+```
+
+Then you can use it anywhere via:
+```bash
+animal
+```
+
 ## Features
 
 - Arithmetic operations using animal sounds (`meow`, `woof`, `moo`, etc.)

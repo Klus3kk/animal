@@ -20,8 +20,12 @@ func (i *Interpreter) visit(node interface{}, context *Context) *RTResult {
 	case BestiaryNode:
 		return i.visitBestiaryNode(node, context)
 	case DebugNode:
-		Debug = true
-		fmt.Println("Debug mode: true")
+		Debug = !Debug
+		//fmt.Println("Debug mode:", Debug)
+		return NewRTResult().success(nil)
+	case TimeNode:
+		TimeEnabled = !TimeEnabled
+		//fmt.Println("Timing mode:", TimeEnabled)
 		return NewRTResult().success(nil)
 	case ShelterNode:
 		return i.visitShelterNode(node, context)

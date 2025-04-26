@@ -947,6 +947,12 @@ func (p *Parser) expr() *ParseResult {
 		return res.success(DebugNode{})
 	}
 
+	if p.Current_Tok.matches(TT_KEY, "%time") {
+		res := &ParseResult{}
+		p.advance()
+		return res.success(TimeNode{})
+	}
+
 	// Print statement
 	if p.Current_Tok.matches(TT_KEY, "roar") {
 		return p.roar_expr()
