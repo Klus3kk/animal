@@ -306,24 +306,23 @@ func (l *Lexer) make_identifier() Token {
 		l.advance()
 	}
 
-	// Force underscore to be treated as a keyword
-	if idStr == "_" {
-		return Token{Type: TT_KEY, Value: "_", Pos_Start: Pos_Start, Pos_End: l.Pos}
-	}
-
-	tok_Type := TT_IDEN
-
-	// Check if identifier is a keyword only if not immediately after '.'
-	if !(l.Pos.Idx > 0 && l.Text[l.Pos.Idx-1] == '.') {
+	switch idStr {
+	case "and":
+		return Token{Type: TT_AND, Value: "and", Pos_Start: Pos_Start, Pos_End: l.Pos.copy()}
+	case "or":
+		return Token{Type: TT_OR, Value: "or", Pos_Start: Pos_Start, Pos_End: l.Pos.copy()}
+	case "_":
+		return Token{Type: TT_KEY, Value: "_", Pos_Start: Pos_Start, Pos_End: l.Pos.copy()}
+	default:
+		tok_Type := TT_IDEN
 		for _, keyword := range KEYWORDS {
 			if idStr == keyword {
 				tok_Type = TT_KEY
 				break
 			}
 		}
+		return Token{Type: tok_Type, Value: idStr, Pos_Start: Pos_Start, Pos_End: l.Pos.copy()}
 	}
-
-	return Token{Type: tok_Type, Value: idStr, Pos_Start: Pos_Start, Pos_End: l.Pos}
 }
 
 func (l *Lexer) make_number() Token {

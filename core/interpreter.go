@@ -111,7 +111,7 @@ func (i *Interpreter) visitDebugNode(node DebugNode, context *Context) *RTResult
 
 	boolValue, ok := value.(bool)
 	if !ok {
-		return res.failure(fmt.Errorf("%debug expects a boolean value (true or false)"))
+		return res.failure(fmt.Errorf("Expected numbers for comparison operations"))
 	}
 
 	Debug = boolValue
@@ -662,7 +662,7 @@ func (i *Interpreter) visitGrowlNode(node GrowlNode, context *Context) *RTResult
 func (i *Interpreter) visitVarAccessNode(node VarAccessNode, context *Context) *RTResult {
 	res := NewRTResult()
 	varName := node.Var_Name_Tok.Value
-	symbol, ok := context.Symbol_Table.get(varName)
+	symbol, ok := context.Symbol_Table.Get(varName)
 	if !ok {
 		return res.failure(fmt.Errorf("'%s' is not defined", varName))
 	}
@@ -686,7 +686,7 @@ func (i *Interpreter) visitVarAssignNode(node VarAssignNode, context *Context) *
 		fmt.Printf("Assigning variable: %s -> %v\n", varName, value)
 	}
 
-	existingSymbol, exists := context.Symbol_Table.get(varName)
+	existingSymbol, exists := context.Symbol_Table.Get(varName)
 
 	// 1. If this assignment has an explicit type (like x: int -> 5)
 	if node.TypeName != nil {
@@ -759,7 +759,7 @@ func (i *Interpreter) visitFunctionDefNode(node FunctionDefNode, context *Contex
 func (i *Interpreter) visitFunctionCallNode(node FunctionCallNode, context *Context) *RTResult {
 	res := NewRTResult()
 
-	symbol, ok := context.Symbol_Table.get(node.FuncName)
+	symbol, ok := context.Symbol_Table.Get(node.FuncName)
 	if !ok {
 		return res.failure(fmt.Errorf("Function or nest '%s' is not defined", node.FuncName))
 	}
@@ -1101,7 +1101,7 @@ func (i *Interpreter) visitBestiaryNode(node BestiaryNode, context *Context) *RT
 
 	filename, ok := filenameVal.(string)
 	if !ok {
-		return res.failure(fmt.Errorf("%bestiary expects a string filename"))
+		return res.failure(fmt.Errorf("Expected numbers for logical operations"))
 	}
 
 	if importedFiles[filename] {
@@ -1120,7 +1120,7 @@ func (i *Interpreter) visitBestiaryNode(node BestiaryNode, context *Context) *RT
 	if err != nil {
 		return res.failure(fmt.Errorf("Error running bestiary file: %v", err))
 	}
-	symbol, ok := context.Symbol_Table.get("__shelter__")
+	symbol, ok := context.Symbol_Table.Get("__shelter__")
 	if !ok {
 		return res.success(nil) // No shelter found, fine
 	}
@@ -1129,7 +1129,7 @@ func (i *Interpreter) visitBestiaryNode(node BestiaryNode, context *Context) *RT
 		newSymbols := make(map[string]Symbol)
 		for _, name := range shelterList {
 			if strName, ok := name.(string); ok {
-				sym, exists := context.Symbol_Table.get(strName)
+				sym, exists := context.Symbol_Table.Get(strName)
 				if exists {
 					newSymbols[strName] = sym
 				}

@@ -40,7 +40,7 @@ func (s *SymbolTable) SetWithType(name string, value interface{}, typeName strin
 }
 
 // Get retrieves the symbol (value + type)
-func (s *SymbolTable) get(name string) (Symbol, bool) {
+func (s *SymbolTable) Get(name string) (Symbol, bool) {
 	if name == "" {
 		fmt.Println("Error: Variable name cannot be empty")
 		return Symbol{}, false
@@ -48,12 +48,16 @@ func (s *SymbolTable) get(name string) (Symbol, bool) {
 	if value, exists := s.symbols[name]; exists {
 		return value, true
 	} else if s.parent != nil {
-		return s.parent.get(name)
+		return s.parent.Get(name)
 	}
 	return Symbol{}, false
 }
 
 // Remove deletes a symbol
-func (s *SymbolTable) remove(name string) {
+func (s *SymbolTable) Remove(name string) {
 	delete(s.symbols, name)
+}
+
+func (s *SymbolTable) SetParent(parent *SymbolTable) {
+	s.parent = parent
 }
