@@ -686,9 +686,10 @@ func (i *Interpreter) visitVarAssignNode(node VarAssignNode, context *Context) *
 		fmt.Printf("Assigning variable: %s -> %v\n", varName, value)
 	}
 
+	// Try to get existing symbol
 	existingSymbol, exists := context.Symbol_Table.Get(varName)
 
-	// 1. If this assignment has an explicit type (like x: int -> 5)
+	// 1. If assignment has an explicit type (like x: int -> 5)
 	if node.TypeName != nil {
 		typeHint := node.TypeName.Value
 
@@ -908,14 +909,13 @@ func (i *Interpreter) visitBinOpNode(node BinOpNode, context *Context) *RTResult
 		}
 		return res.failure(fmt.Errorf("Cannot concatenate non-string types"))
 
-	// Comparison Operators
-	case TT_GT, TT_LT, TT_GTE, TT_LTE, TT_EQEQ, TT_NEQ:
+	case TT_GT, TT_LT, TT_GTE, TT_LTE:
+		// For >, <, >=, <= — numbers only
 		leftFloat, okLeft := leftValue.(float64)
 		rightFloat, okRight := rightValue.(float64)
 		if !okLeft || !okRight {
 			return res.failure(fmt.Errorf("Expected numbers for comparison operations"))
 		}
-
 		switch node.Op_Tok.Type {
 		case TT_GT:
 			return res.success(leftFloat > rightFloat)
@@ -925,10 +925,43 @@ func (i *Interpreter) visitBinOpNode(node BinOpNode, context *Context) *RTResult
 			return res.success(leftFloat >= rightFloat)
 		case TT_LTE:
 			return res.success(leftFloat <= rightFloat)
-		case TT_EQEQ:
-			return res.success(leftFloat == rightFloat)
-		case TT_NEQ:
-			return res.success(leftFloat != rightFloat)
+		}
+
+	case TT_EQEQ, TT_NEQ:
+		// For ==, != — allow numbers, booleans, strings
+		switch left := leftValue.(type) {
+		case float64:
+			right, ok := rightValue.(float64)
+			if !ok {
+				return res.failure(fmt.Errorf("Expected both sides to be numbers"))
+			}
+			if node.Op_Tok.Type == TT_EQEQ {
+				return res.success(left == right)
+			} else {
+				return res.success(left != right)
+			}
+		case bool:
+			right, ok := rightValue.(bool)
+			if !ok {
+				return res.failure(fmt.Errorf("Expected both sides to be booleans"))
+			}
+			if node.Op_Tok.Type == TT_EQEQ {
+				return res.success(left == right)
+			} else {
+				return res.success(left != right)
+			}
+		case string:
+			right, ok := rightValue.(string)
+			if !ok {
+				return res.failure(fmt.Errorf("Expected both sides to be strings"))
+			}
+			if node.Op_Tok.Type == TT_EQEQ {
+				return res.success(left == right)
+			} else {
+				return res.success(left != right)
+			}
+		default:
+			return res.failure(fmt.Errorf("Unsupported types for == or !="))
 		}
 
 	// Logical Operators

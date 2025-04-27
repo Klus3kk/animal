@@ -1,0 +1,53 @@
+roar "Welcome to Animal Calculator!"
+roar "Available operations: add, subtract, multiply, divide"
+roar "Type 'exit' to quit."
+
+pounce true == true {
+    roar "Choose operation:"
+    operation -> listen
+
+    growl operation == "exit" {
+        roar "Goodbye!"
+        whimper
+    }
+
+    growl operation != "add" and operation != "subtract" and operation != "multiply" and operation != "divide" {
+        roar "Invalid operation. Try again."
+        hiss
+    }
+
+    roar "Enter first number:"
+    num1 -> listen
+    roar "Enter second number:"
+    num2 -> listen
+
+    howl to_number(x) {
+        x sniffback
+    }
+
+    a -> to_number(num1)
+    b -> to_number(num2)
+
+    growl operation == "add" {
+        result -> a meow b
+    }
+    sniff operation == "subtract" {
+        result -> a woof b
+    }
+    sniff operation == "multiply" {
+        result -> a moo b
+    }
+    sniff operation == "divide" {
+        growl b == 0 {
+            roar "Cannot divide by zero!"
+            hiss
+        }
+        result -> a drone b
+    }
+    wag {
+        roar "Unknown operation."
+        hiss
+    }
+
+    roar "Result:", result
+}
