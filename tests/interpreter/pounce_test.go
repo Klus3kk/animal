@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func interpretInputPounce(t *testing.T, input string) (interface{}, error) {
+func interpretInputPounce(t *testing.T, input string) (*core.SymbolTable, error) {
 	t.Helper()
 
 	globalSymbolTable := core.NewSymbolTable()
@@ -14,7 +14,8 @@ func interpretInputPounce(t *testing.T, input string) (interface{}, error) {
 		Symbol_Table: globalSymbolTable,
 	}
 
-	return core.CustomRun(input, "<stdin>", context)
+	_, err := core.CustomRun(input, "<stdin>", context)
+	return globalSymbolTable, err
 }
 
 func TestInterpreter_PounceBasicLoop(t *testing.T) {
@@ -23,15 +24,15 @@ x -> 3
 pounce x > 0 {
     x -> x woof 1
 }
-roar x
 `
-	result, err := interpretInputPounce(t, code)
+	table, err := interpretInputPounce(t, code)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 
-	if num, ok := result.(float64); !ok || num != 0 {
-		t.Errorf("Expected x to be 0 after pounce, got %v", result)
+	x, _ := table.Get("x")
+	if int(x.Value.(float64)) != 0 {
+		t.Errorf("Expected x to be 0 after pounce, got %v", x.Value)
 	}
 }
 
@@ -44,15 +45,15 @@ pounce x > 0 {
     }
     x -> x woof 1
 }
-roar x
 `
-	result, err := interpretInputPounce(t, code)
+	table, err := interpretInputPounce(t, code)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 
-	if num, ok := result.(float64); !ok || num != 3 {
-		t.Errorf("Expected x to be 3 after whimper break, got %v", result)
+	x, _ := table.Get("x")
+	if int(x.Value.(float64)) != 3 {
+		t.Errorf("Expected x to be 3 after whimper break, got %v", x.Value)
 	}
 }
 
@@ -67,14 +68,14 @@ pounce x > 0 {
     }
     y -> y meow 1
 }
-roar y
 `
-	result, err := interpretInputPounce(t, code)
+	table, err := interpretInputPounce(t, code)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 
-	if num, ok := result.(float64); !ok || num != 4 {
-		t.Errorf("Expected y to be 4 (skipped increment once), got %v", result)
+	y, _ := table.Get("y")
+	if int(y.Value.(float64)) != 4 {
+		t.Errorf("Expected y to be 4 (skipped increment once), got %v", y.Value)
 	}
 }

@@ -89,6 +89,19 @@ func (i *Interpreter) visit(node interface{}, context *Context) *RTResult {
 		return i.visitWhimperNode(node, context)
 	case HissNode:
 		return i.visitHissNode(node, context)
+	case []interface{}:
+		res := NewRTResult()
+		var lastValue interface{}
+		for _, stmt := range node {
+			result := i.visit(stmt, context)
+			if result.Error != nil {
+				return result
+			}
+			if result.Value != nil {
+				lastValue = result.Value
+			}
+		}
+		return res.success(lastValue)
 	case SniffbackNode: // return node
 		val := i.visit(node.Value, context)
 		res := NewRTResult()
@@ -426,18 +439,19 @@ func (i *Interpreter) visitDotCallNode(node DotCallNode, context *Context) *RTRe
 			listVal = append(listVal, val)
 
 		case "howl":
-			idxRaw := res.register(i.visit(node.Args[0], context))
+			if len(node.Args) != 1 {
+				return res.failure(fmt.Errorf("howl expects 1 argument"))
+			}
+			arg := res.register(i.visit(node.Args[0], context))
 			if res.Error != nil {
 				return res
 			}
-			idxFloat, ok := idxRaw.(float64)
-			if !ok {
-				return res.failure(fmt.Errorf("Expected index to be a number"))
+			for idx, v := range listVal {
+				if fmt.Sprintf("%v", v) == fmt.Sprintf("%v", arg) {
+					return res.success(float64(idx))
+				}
 			}
-			idx := int(idxFloat)
-			if idx >= 0 && idx < len(listVal) {
-				listVal = append(listVal[:idx], listVal[idx+1:]...)
-			}
+			return res.success(float64(-1))
 
 		case "wag":
 			return res.success(float64(len(listVal)))
@@ -637,7 +651,6 @@ func (i *Interpreter) visitGrowlNode(node GrowlNode, context *Context) *RTResult
 				Parent:       context,
 				Symbol_Table: context.Symbol_Table,
 			}
-			childCtx.Symbol_Table.parent = context.Symbol_Table
 
 			return res.success(res.register(i.visit(caseBlock.Body, childCtx)))
 		}
@@ -650,7 +663,6 @@ func (i *Interpreter) visitGrowlNode(node GrowlNode, context *Context) *RTResult
 			Parent:       context,
 			Symbol_Table: context.Symbol_Table,
 		}
-		childCtx.Symbol_Table.parent = context.Symbol_Table
 
 		return res.success(res.register(i.visit(node.ElseCase, childCtx)))
 	}
@@ -753,13 +765,19 @@ func (i *Interpreter) visitListenNode(node ListenNode, context *Context) *RTResu
 // Using howl functions
 func (i *Interpreter) visitFunctionDefNode(node FunctionDefNode, context *Context) *RTResult {
 	res := NewRTResult()
+	if Debug {
+		fmt.Printf("[DEBUG] Registering function: %s\n", node.Name)
+	}
 	context.Symbol_Table.Set(node.Name, node)
 	return res.success(nil)
 }
 
 func (i *Interpreter) visitFunctionCallNode(node FunctionCallNode, context *Context) *RTResult {
 	res := NewRTResult()
-
+	if Debug {
+		fmt.Printf("[DEBUG] Attempting to call function: %s\n", node.FuncName)
+		fmt.Printf("[DEBUG] Current context symbols: %v\n", context.Symbol_Table.symbols)
+	}
 	symbol, ok := context.Symbol_Table.Get(node.FuncName)
 	if !ok {
 		return res.failure(fmt.Errorf("Function or nest '%s' is not defined", node.FuncName))
@@ -1052,7 +1070,6 @@ func (i *Interpreter) visitPounceNode(node PounceNode, context *Context) *RTResu
 				Parent:       context,
 				Symbol_Table: context.Symbol_Table,
 			}
-			childCtx.Symbol_Table.parent = context.Symbol_Table
 
 			result := i.visit(stmt, childCtx)
 			if result.Error != nil {
@@ -1101,13 +1118,14 @@ func (i *Interpreter) visitLeapNode(node LeapNode, context *Context) *RTResult {
 	}
 
 	for iter := int(start); iter < int(endVal); iter++ {
+		// SET iteration variable directly into parent context
+		context.Symbol_Table.Set(node.VarName.Value, float64(iter))
+
 		childCtx := &Context{
 			DisplayName:  "leap-iteration",
 			Parent:       context,
-			Symbol_Table: NewSymbolTable(),
+			Symbol_Table: context.Symbol_Table,
 		}
-		childCtx.Symbol_Table.parent = context.Symbol_Table
-		childCtx.Symbol_Table.Set(node.VarName.Value, float64(iter))
 
 		result := i.visit(node.Body, childCtx)
 		if result.Error != nil {

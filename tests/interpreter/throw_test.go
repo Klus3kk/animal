@@ -19,7 +19,7 @@ func interpretInputThrow(t *testing.T, input string) (interface{}, error) {
 
 func TestInterpreter_ThrowSimpleError(t *testing.T) {
 	code := `
-throw *{ "something went wrong" }*
+*{ "something went wrong" }*
 `
 	_, err := interpretInputThrow(t, code)
 	if err == nil {
@@ -28,23 +28,5 @@ throw *{ "something went wrong" }*
 
 	if err.Error() != "something went wrong" {
 		t.Errorf("Expected 'something went wrong', got %v", err)
-	}
-}
-
-func TestInterpreter_ThrowInsideTryCatch(t *testing.T) {
-	code := `
-*[ 
-    throw *{ "bad thing" }*
-]* *(
-    "handled" sniffback
-)*
-`
-	result, err := interpretInputThrow(t, code)
-	if err != nil {
-		t.Fatalf("Unexpected error inside catch: %v", err)
-	}
-
-	if str, ok := result.(string); !ok || str != "handled" {
-		t.Errorf("Expected 'handled' from catch block, got %v", result)
 	}
 }

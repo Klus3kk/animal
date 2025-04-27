@@ -54,7 +54,7 @@ add(3, 4)
 func TestInterpreter_FunctionMultipleCalls(t *testing.T) {
 	code := `
 howl square(x) {
-    x meow x sniffback
+    x moo x sniffback
 }
 square(2)
 square(5)

@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func interpretInputLeap(t *testing.T, input string) (interface{}, error) {
+func interpretInputLeap(t *testing.T, input string) (*core.SymbolTable, error) {
 	t.Helper()
 
 	globalSymbolTable := core.NewSymbolTable()
@@ -14,7 +14,8 @@ func interpretInputLeap(t *testing.T, input string) (interface{}, error) {
 		Symbol_Table: globalSymbolTable,
 	}
 
-	return core.CustomRun(input, "<stdin>", context)
+	_, err := core.CustomRun(input, "<stdin>", context)
+	return globalSymbolTable, err
 }
 
 func TestInterpreter_LeapSimple(t *testing.T) {
@@ -23,16 +24,15 @@ sum -> 0
 leap i from 0 to 5 {
     sum -> sum meow i
 }
-roar sum
 `
-	result, err := interpretInputLeap(t, code)
+	table, err := interpretInputLeap(t, code)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 
-	expected := 0 + 1 + 2 + 3 + 4 // leap is exclusive: to 5 (not including 5)
-	if num, ok := result.(float64); !ok || int(num) != expected {
-		t.Errorf("Expected sum %d, got %v", expected, result)
+	sum, _ := table.Get("sum")
+	if int(sum.Value.(float64)) != 10 {
+		t.Errorf("Expected sum 10, got %v", sum.Value)
 	}
 }
 
@@ -45,15 +45,15 @@ leap i from 0 to 5 {
     }
     sum -> sum meow 1
 }
-roar sum
 `
-	result, err := interpretInputLeap(t, code)
+	table, err := interpretInputLeap(t, code)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 
-	if num, ok := result.(float64); !ok || int(num) != 3 {
-		t.Errorf("Expected sum 3 after whimper break, got %v", result)
+	sum, _ := table.Get("sum")
+	if int(sum.Value.(float64)) != 3 {
+		t.Errorf("Expected sum 3 after whimper break, got %v", sum.Value)
 	}
 }
 
@@ -66,14 +66,14 @@ leap i from 0 to 5 {
     }
     sum -> sum meow 1
 }
-roar sum
 `
-	result, err := interpretInputLeap(t, code)
+	table, err := interpretInputLeap(t, code)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 
-	if num, ok := result.(float64); !ok || int(num) != 4 {
-		t.Errorf("Expected sum 4 (one hissed iteration skipped), got %v", result)
+	sum, _ := table.Get("sum")
+	if int(sum.Value.(float64)) != 4 {
+		t.Errorf("Expected sum 4 (one hissed iteration skipped), got %v", sum.Value)
 	}
 }

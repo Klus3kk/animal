@@ -20,4 +20,4 @@ jobs:
 
       - name: Test Animal Language Core
         run: |
-          go test ./tests/... -v
+          go test ./tests/... ./tests/interpreter/...  -v

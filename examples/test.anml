@@ -1,0 +1,87 @@
+:: Initialize variables
+sum -> 0
+x -> 5
+y -> 0
+
+:: LEAP LOOP: sum 0+1+2+3+4
+leap i from 0 to 5 {
+    sum -> sum meow i
+}
+
+roar "Sum after leap:", sum  :: Should print 10
+
+:: LEAP LOOP with WHIMPER (break at i==3)
+sum2 -> 0
+leap j from 0 to 5 {
+    growl j == 3 {
+        whimper
+    }
+    sum2 -> sum2 meow 1
+}
+
+roar "Sum2 after leap with whimper:", sum2  :: Should print 3
+
+:: LEAP LOOP with HISS (continue at i==2)
+sum3 -> 0
+leap k from 0 to 5 {
+    growl k == 2 {
+        hiss
+    }
+    sum3 -> sum3 meow 1
+}
+
+roar "Sum3 after leap with hiss:", sum3  :: Should print 4
+
+:: POUNCE LOOP: Decrement x to 0
+pounce x > 0 {
+    x -> x woof 1
+}
+
+roar "x after pounce loop:", x  :: Should print 0
+
+:: POUNCE LOOP with WHIMPER (break)
+x2 -> 5
+pounce x2 > 0 {
+    growl x2 == 3 {
+        whimper
+    }
+    x2 -> x2 woof 1
+}
+
+roar "x2 after pounce with whimper:", x2  :: Should print 3
+
+:: POUNCE LOOP with HISS (continue skip)
+x3 -> 5
+y3 -> 0
+pounce x3 > 0 {
+    x3 -> x3 woof 1
+    growl x3 == 3 {
+        hiss
+    }
+    y3 -> y3 meow 1
+}
+
+roar "y3 after pounce with hiss:", y3  :: Should print 4
+
+:: LIST HOWL (find index)
+l -> [10, 20, 30]
+idx -> l.howl(20)
+
+roar "Index of 20:", idx  :: Should print 1
+
+:: FUNCTION TEST
+howl square(n) {
+    n moo n sniffback
+}
+
+result -> square(5)
+
+roar "Square of 5:", result  :: Should print 25
+
+:: THROW / TRY-CATCH TEST
+*[
+    *{ "something bad happened" }*
+]*
+*(
+    roar "Caught error:", _error
+)*

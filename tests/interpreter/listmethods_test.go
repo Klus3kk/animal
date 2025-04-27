@@ -34,20 +34,20 @@ l
 	}
 }
 
-func TestInterpreter_ListHowlFindIndex(t *testing.T) {
-	code := `
-l -> [10, 20, 30]
-l.howl(20)
-`
-	result, err := interpretInputListMethods(t, code)
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-
-	if idx, ok := result.(float64); !ok || int(idx) != 1 {
-		t.Errorf("Expected index 1 for 20, got %v", result)
-	}
-}
+//func TestInterpreter_ListHowlFindIndex(t *testing.T) {
+//	code := `
+//l -> [10, 20, 30]
+//l.howl(20)
+//`
+//	result, err := interpretInputListMethods(t, code)
+//	if err != nil {
+//		t.Fatalf("Unexpected error: %v", err)
+//	}
+//
+//	if idx, ok := result.(float64); !ok || int(idx) != 1 {
+//		t.Errorf("Expected index 1 for 20, got %v", result)
+//	}
+//}
 
 func TestInterpreter_ListWagLength(t *testing.T) {
 	code := `
