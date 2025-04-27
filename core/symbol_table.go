@@ -47,7 +47,8 @@ func (s *SymbolTable) Get(name string) (Symbol, bool) {
 	}
 	if value, exists := s.symbols[name]; exists {
 		return value, true
-	} else if s.parent != nil {
+	}
+	if s.parent != nil && s.parent != s {
 		return s.parent.Get(name)
 	}
 	return Symbol{}, false

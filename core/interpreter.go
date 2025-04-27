@@ -635,7 +635,7 @@ func (i *Interpreter) visitGrowlNode(node GrowlNode, context *Context) *RTResult
 			childCtx := &Context{
 				DisplayName:  "growl-block",
 				Parent:       context,
-				Symbol_Table: NewSymbolTable(),
+				Symbol_Table: context.Symbol_Table,
 			}
 			childCtx.Symbol_Table.parent = context.Symbol_Table
 
@@ -648,7 +648,7 @@ func (i *Interpreter) visitGrowlNode(node GrowlNode, context *Context) *RTResult
 		childCtx := &Context{
 			DisplayName:  "wag-block",
 			Parent:       context,
-			Symbol_Table: NewSymbolTable(),
+			Symbol_Table: context.Symbol_Table,
 		}
 		childCtx.Symbol_Table.parent = context.Symbol_Table
 
@@ -1050,7 +1050,7 @@ func (i *Interpreter) visitPounceNode(node PounceNode, context *Context) *RTResu
 			childCtx := &Context{
 				DisplayName:  "pounce-block",
 				Parent:       context,
-				Symbol_Table: NewSymbolTable(),
+				Symbol_Table: context.Symbol_Table,
 			}
 			childCtx.Symbol_Table.parent = context.Symbol_Table
 

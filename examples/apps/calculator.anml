@@ -2,7 +2,9 @@ roar "Welcome to Animal Calculator!"
 roar "Available operations: add, subtract, multiply, divide"
 roar "Type 'exit' to quit."
 
-pounce true == true {
+operation -> ""
+
+pounce operation != "exit" {
     roar "Choose operation:"
     operation -> listen
 
@@ -22,7 +24,7 @@ pounce true == true {
     num2 -> listen
 
     howl to_number(x) {
-        x sniffback
+        scent(x,10) sniffback
     }
 
     a -> to_number(num1)
