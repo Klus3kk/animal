@@ -1,0 +1,23 @@
+:: Variable assignment without type (dynamic)
+a -> 123
+roar a   :: Expect 123
+
+b -> "hello"
+roar b   :: Expect hello
+
+:: Variable assignment with type
+x: int -> 10
+roar x   :: Expect 10
+
+y: string -> "world"
+roar y   :: Expect world
+
+z: bool -> true
+roar z   :: Expect true
+
+:: Reassign with correct type
+x -> 99
+roar x   :: Expect 99
+
+:: Reassign with WRONG type (should throw runtime error)
+y -> 123   :: Expect TYPE MISMATCH ERROR

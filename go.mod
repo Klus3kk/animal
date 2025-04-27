@@ -1,4 +1,4 @@
-module animal/animal/v2
+module animal
 
 go 1.21.6
 
