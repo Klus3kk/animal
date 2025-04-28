@@ -607,7 +607,7 @@ func (i *Interpreter) visitRoarNode(node RoarNode, context *Context) *RTResult {
 
 	// If empty roar, print newline
 	if node.Value == nil {
-		fmt.Println()
+		Print()
 		return res.success(nil)
 	}
 
@@ -618,7 +618,7 @@ func (i *Interpreter) visitRoarNode(node RoarNode, context *Context) *RTResult {
 		if res.Error != nil {
 			return res
 		}
-		fmt.Println(value)
+		Print(value)
 		return res.success(nil)
 	}
 
@@ -631,7 +631,7 @@ func (i *Interpreter) visitRoarNode(node RoarNode, context *Context) *RTResult {
 		outputs = append(outputs, fmt.Sprint(val))
 	}
 
-	fmt.Println(strings.Join(outputs, " "))
+	Print(strings.Join(outputs, " "))
 	return res.success(nil)
 }
 

@@ -1,6 +1,32 @@
 package core
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
+
+
+var (
+	OutputBuffer  strings.Builder
+	CaptureOutput = false
+)
+
+func Print(args ...interface{}) {
+	text := fmt.Sprint(args...)
+	if CaptureOutput {
+		OutputBuffer.WriteString(text + "\n")
+	} else {
+		fmt.Println(args...)
+	}
+}
+
+func GetCapturedOutput() string {
+	return OutputBuffer.String()
+}
+
+func ClearCapturedOutput() {
+	OutputBuffer.Reset()
+}
 
 func CustomRun(text string, fn string, context *Context) (interface{}, error) {
 	lexer := NewLexer(fn, text)
