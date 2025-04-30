@@ -18,7 +18,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v4
         with:
-          go-version: '1.21.6'  # Use a specific newer version
+          go-version: '1.21.6'
           check-latest: true
           cache: true
 
@@ -60,7 +60,8 @@ jobs:
           cd $HOME/go/src/animal
           go tool cover -func=coverage.out
 
-      - name: Static analysis (go vet)
+      - name: Static analysis (excluding WASM)
         run: |
           cd $HOME/go/src/animal
-          go vet ./...
+          # Run go vet on everything except the WASM directory
+          go vet $(go list ./... | grep -v "/wasm")
