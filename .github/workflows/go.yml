@@ -22,10 +22,12 @@ jobs:
         with:
           go-version: ${{ matrix.go-version }}
 
+      - name: Set up Go modules
+        run: go mod tidy
+
       - name: Run tests with coverage
         run: |
-          go test $(go list ./... | grep -vE '/(wasm|cmd)') -v -coverprofile=coverage.out
-          go tool cover -func=coverage.out
+          go test ./core/... ./tests/... ./tests/interpreter/... -v -coverprofile=coverage.out
 
       - name: Show coverage summary
         run: go tool cover -func=coverage.out
