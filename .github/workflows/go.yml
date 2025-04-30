@@ -22,9 +22,6 @@ jobs:
         with:
           go-version: ${{ matrix.go-version }}
 
-      - name: Install dependencies
-        run: go mod tidy
-
       - name: Run tests with coverage
         run: |
           go test $(go list ./... | grep -vE '/(wasm|cmd)') -v -coverprofile=coverage.out
