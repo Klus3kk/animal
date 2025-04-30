@@ -2,7 +2,6 @@ package main
 
 import (
 	"animal/core"
-	"fmt"
 	"syscall/js"
 )
 
@@ -18,7 +17,7 @@ func runAnimal(this js.Value, args []js.Value) interface{} {
 	core.ClearCapturedOutput() // Reset buffer first
 	core.CaptureOutput = true  // Start capturing!
 
-	result, err := core.CustomRun(code, "<stdin>", context)
+	_, err := core.CustomRun(code, "<stdin>", context)
 
 	output := core.GetCapturedOutput()
 	core.CaptureOutput = false // Stop capturing after run
