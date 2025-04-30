@@ -9,50 +9,58 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        go-version: [1.18, 1.19, 1.20]
 
     steps:
-      - name: Setup Go ${{ matrix.go-version }}
-        uses: actions/setup-go@v4
-        with:
-          go-version: ${{ matrix.go-version }}
-
-      - name: Debug environment
-        run: |
-          go version
-          go env
-          ls -la
-          echo "Current directory: $(pwd)"
-          echo "Go executable: $(which go)"
-
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Debug after checkout
-        run: |
-          ls -la
-          echo "Current directory: $(pwd)"
-          echo "Go executable: $(which go)"
+      # Force a newer Go version to be used
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.21.6'  # Use a specific newer version
+          check-latest: true
+          cache: true
 
-      - name: Manual module initialization
+      - name: Verify Go installation
+        run: |
+          go version
+          echo "GOPATH=$GOPATH"
+          echo "GOROOT=$GOROOT"
+
+      # Make sure we're using Go modules
+      - name: Setup Go modules
         run: |
           if [ ! -f go.mod ]; then
-            echo "Creating go.mod manually"
-            echo "module animal" > go.mod
-            echo "go 1.18" >> go.mod
-          else
-            echo "go.mod exists:"
-            cat go.mod
+            echo "Creating go.mod file"
+            go mod init animal
           fi
+          # Check module configuration
+          cat go.mod
+
+      # Set up proper workspace for older Go compatibility
+      - name: Set up workspace
+        run: |
+          # Create GOPATH structure if needed
+          mkdir -p $HOME/go/src/animal
+          # Copy code to correct location
+          cp -r * $HOME/go/src/animal/
+          # Set GOPATH
+          echo "GOPATH=$HOME/go" >> $GITHUB_ENV
+          echo "Added to GITHUB_ENV: GOPATH=$HOME/go"
 
       - name: Run tests with coverage
         run: |
-          go test ./core/... ./tests/... ./tests/interpreter/... -v -coverprofile=coverage.out
+          cd $HOME/go/src/animal
+          # Run tests with full paths
+          go test -v ./core/... ./tests/... ./tests/interpreter/... -coverprofile=coverage.out
 
       - name: Show coverage summary
-        run: go tool cover -func=coverage.out
+        run: |
+          cd $HOME/go/src/animal
+          go tool cover -func=coverage.out
 
       - name: Static analysis (go vet)
-        run: go vet ./...
+        run: |
+          cd $HOME/go/src/animal
+          go vet ./...
