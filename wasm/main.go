@@ -1,8 +1,8 @@
 package main
 
 import (
-	"fmt"
 	"animal/core"
+	"fmt"
 	"syscall/js"
 )
 
@@ -15,22 +15,22 @@ func runAnimal(this js.Value, args []js.Value) interface{} {
 		Symbol_Table: globalSymbolTable,
 	}
 
-	core.ClearCapturedOutput()   // Reset buffer first
-	core.CaptureOutput = true    // Start capturing!
+	core.ClearCapturedOutput() // Reset buffer first
+	core.CaptureOutput = true  // Start capturing!
 
 	result, err := core.CustomRun(code, "<stdin>", context)
 
 	output := core.GetCapturedOutput()
-	core.CaptureOutput = false   // Stop capturing after run
+	core.CaptureOutput = false // Stop capturing after run
 
 	if err != nil {
 		return js.ValueOf("Error: " + err.Error())
 	}
-
-	// If result exists, append it too
-	if result != nil {
-		output += fmt.Sprintf("%v", result)
-	}
+	//
+	//// If result exists, append it too
+	//if result != nil {
+	//	output += fmt.Sprintf("%v", result)
+	//}
 
 	return js.ValueOf(output)
 }
