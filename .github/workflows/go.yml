@@ -8,22 +8,29 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
     strategy:
       matrix:
         go-version: [1.20, 1.21, 1.22, 1.23]
 
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+    runs-on: ubuntu-latest
 
-      - name: Set up Go ${{ matrix.go-version }}
-        uses: actions/setup-go@v4
+    steps:
+      - uses: actions/setup-go@v4
         with:
           go-version: ${{ matrix.go-version }}
 
-      - name: Set up Go modules
-        run: go mod tidy
+      - name: Print Go version (debug)
+        run: go version
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Initialize go.mod (only if missing)
+        run: |
+          if [ ! -f go.mod ]; then
+            go mod init animal
+          fi
+          go mod tidy
 
       - name: Run tests with coverage
         run: |
