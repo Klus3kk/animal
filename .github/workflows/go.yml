@@ -8,14 +8,14 @@ on:
 
 jobs:
   test:
+    runs-on: ubuntu-latest
     strategy:
       matrix:
         go-version: [1.20, 1.21, 1.22, 1.23]
 
-    runs-on: ubuntu-latest
-
     steps:
-      - uses: actions/setup-go@v4
+      - name: Setup Go ${{ matrix.go-version }}
+        uses: actions/setup-go@v4
         with:
           go-version: ${{ matrix.go-version }}
 
@@ -25,7 +25,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Initialize go.mod (only if missing)
+      - name: Generate go.mod if missing
         run: |
           if [ ! -f go.mod ]; then
             go mod init animal
@@ -39,5 +39,5 @@ jobs:
       - name: Show coverage summary
         run: go tool cover -func=coverage.out
 
-      - name: Run static analysis (go vet)
+      - name: Static analysis (go vet)
         run: go vet ./...
