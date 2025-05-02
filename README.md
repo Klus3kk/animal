@@ -114,7 +114,7 @@ go install github.com/Klus3kk/animal/cmd/animal@latest
 
 ## Online Compiler
 
-Try Animal without installation using our [Online Compiler](https://animal-compiler.example.com).
+Try Animal without installation using our [Online Compiler](https://animal-lang.github.io/animal-playground).
 
 ## Examples
 
