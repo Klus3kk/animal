@@ -64,9 +64,3 @@ Contents
    development/contributing
    development/testing
    development/roadmap
-
-Indices and Tables
------------------
-
-* :ref:`genindex`
-* :ref:`search`
