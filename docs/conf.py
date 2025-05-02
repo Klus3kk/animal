@@ -18,6 +18,7 @@ extensions = [
     'sphinx.ext.napoleon',  # Support for Google-style docstrings
     'sphinx_rtd_theme',     # Read the Docs theme
     'myst_parser',          # Support for Markdown
+    'sphinx.ext.graphviz',
 ]
 
 # Add any paths that contain templates here
