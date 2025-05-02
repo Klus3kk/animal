@@ -15,51 +15,6 @@ The Animal interpreter follows a classic language implementation pattern with th
 
 The interpreter is implemented in Go, making it fast, portable, and easy to extend.
 
-Component Diagram
----------------
-
-.. code-block:: text
-
-                  ┌─────────────┐
-                  │  Source     │
-                  │  Code       │
-                  └──────┬──────┘
-                         │
-                         ▼
-            ┌────────────────────────┐
-            │  Lexer                 │
-            │  (core/lexer.go)       │
-            │                        │
-            │  Text → Tokens         │
-            └────────────┬───────────┘
-                         │
-                         ▼
-            ┌────────────────────────┐
-            │  Parser                │
-            │  (core/parser.go)      │
-            │                        │
-            │  Tokens → AST          │
-            └────────────┬───────────┘
-                         │
-                         ▼
-   ┌───────────────────────────────────────┐
-   │  Interpreter                          │
-   │  (core/interpreter.go)                │
-   │                                       │
-   │  AST → Execution                      │
-   └────────────────────┬──────────────────┘
-                        │
-        ┌───────────────┴───────────────┐
-        │                               │
-        ▼                               ▼
-┌─────────────────┐          ┌────────────────────┐
-│ Symbol Table    │          │ Standard Library   │
-│ (core/symbol_   │          │ (core/std/*.go)    │
-│ table.go)       │          │                    │
-└─────────────────┘          └────────────────────┘
-
-----
-
 The lexer (``core/lexer.go``) is responsible for reading the source code and converting it into tokens. This process is called lexical analysis or tokenization.
 
 Key responsibilities:

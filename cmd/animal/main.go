@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-const AnimalVersion = "0.1.0"
+const AnimalVersion = "0.1.1"
 
 func debugParse(input string) {
 	lexer := core.NewLexer("<stdin>", input)

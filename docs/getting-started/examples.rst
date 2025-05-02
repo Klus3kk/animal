@@ -442,4 +442,3 @@ A more complex example of a todo list manager:
    roar "\nUpdated list:"
    list_todos()
 
-These examples demonstrate a wide range of Animal language features and can serve as a foundation for your own Animal programs.

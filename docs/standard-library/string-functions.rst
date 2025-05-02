@@ -285,21 +285,3 @@ Example implementation of a contains function:
    has_lang -> contains(text, "Language")   :: true
    has_code -> contains(text, "code")       :: false
 
-Best Practices for String Handling
--------------------------------
-
-1. **String Concatenation**:
-   - For joining many strings, build an array and use a join function rather than multiple ``purr`` operations
-   - For building strings in loops, use a single variable and append to it
-
-2. **Performance Considerations**:
-   - Remember that strings are immutable, so each operation creates a new string
-   - For complex manipulations, consider breaking the string into a character array first
-
-3. **String Conversions**:
-   - Always validate user input before converting to numbers with ``scent()``
-   - Use ``purr()`` for consistent number-to-string conversion
-
-4. **Localization**:
-   - For multilingual applications, consider storing strings in separate files
-   - Be mindful that the string functions may not handle all Unicode characters equally

@@ -206,22 +206,3 @@ Create configuration files that can be imported:
        roar "Debug mode is enabled"
    }
 
-Limitations
----------
-
-The current module system in Animal has some limitations:
-
-1. No support for circular dependencies
-2. No lazy loading - all code is executed on import
-3. Limited namespace management
-4. No built-in package manager
-
-Future Enhancements
------------------
-
-Future versions of Animal may introduce:
-
-- Better dependency management
-- Runtime module loading
-- Proper namespaces
-- Package management system

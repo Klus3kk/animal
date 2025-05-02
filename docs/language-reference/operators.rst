@@ -203,19 +203,4 @@ You can use parentheses to override default precedence:
    :: With parentheses
    result2 -> (2 meow 3) moo 4  :: (2 + 3) * 4 = 20
 
-Type Coercion
------------
 
-Animal performs some automatic type conversions:
-
-- When mixing integers and floats, integers are converted to floats
-- When concatenating strings with other types, the other types are converted to strings
-- Comparison operators attempt to convert types for comparison
-
-Best Practices
-------------
-
-1. Use parentheses to make complex expressions clearer
-2. Be aware of potential type conversions, especially with mixed numeric types
-3. Use the animal-themed operators consistently for readability
-4. Avoid overly complex expressions by breaking them into smaller parts

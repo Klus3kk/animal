@@ -196,15 +196,3 @@ Example of a standard library function implementation:
        symbolTable.Set("example_function", AnimalExampleFunction)
    }
 
-For more information on contributing to the standard library, see :doc:`../development/contributing`.
-
-Best Practices
-------------
-
-When using the standard library:
-
-1. Familiarize yourself with existing functions to avoid reinventing the wheel
-2. Check function documentation for proper argument types and usage
-3. Use error handling with file operations to manage potential failures
-4. Consider performance implications for operations on large data sets
-5. Test your code thoroughly, especially when using I/O functions

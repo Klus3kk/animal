@@ -149,12 +149,3 @@ Remember that Animal has its own unique operators for mathematical operations:
 
 These operators can be used alongside the standard library math functions.
 
-Performance Considerations
-------------------------
-
-When performing complex mathematical calculations:
-
-1. Use built-in functions where available for better performance
-2. Be aware that all numbers in Animal are stored as floating-point values
-3. For large calculations, break down the work into smaller functions
-4. Consider potential precision issues with floating-point arithmetic in iterative calculations

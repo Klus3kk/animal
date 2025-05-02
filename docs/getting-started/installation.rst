@@ -25,13 +25,19 @@ Installing from Source
 
       go build -o animal.exe ./cmd/animal
 
+   Alternatively, you can use the Go install command:
+
+   .. code-block:: bash
+
+      go install ./cmd/animal@latest
+
 3. Verify the installation
 
    .. code-block:: bash
 
-      ./animal.exe --version
+      ./animal --version
 
-The command should display the version of Animal that you've just installed.
+   The command should display the version of Animal that you've just installed.
 
 Adding Animal to Your PATH
 -------------------------
@@ -65,25 +71,23 @@ You can start an interactive REPL (Read-Eval-Print Loop) by running Animal witho
 
 This will open an interactive session where you can type Animal code and see the results immediately.
 
-Installing VS Code Extension
---------------------------
+Platform-Specific Notes
+---------------------
 
-For a better development experience, you can install the Animal VS Code extension:
+Windows
+^^^^^^^
 
-1. Open VS Code
-2. Go to Extensions (Ctrl+Shift+X)
-3. Search for "Animal Language"
-4. Click "Install"
+- The executable will be named ``animal.exe``
+- You may need to run the command prompt as Administrator when building
 
-The extension provides syntax highlighting, code snippets, and integration with the Animal interpreter.
+Linux
+^^^^^
 
-Troubleshooting
--------------
+- You may need to add execute permissions: ``chmod +x animal``
+- Consider placing the binary in ``/usr/local/bin`` for system-wide installation
 
-If you encounter any issues during installation:
+macOS
+^^^^^
 
-1. Make sure you have the correct Go version: ``go version``
-2. Check that your ``GOPATH`` is set correctly: ``go env GOPATH``
-3. Ensure you have build permissions in your directory
-
-For further assistance, please file an issue on our GitHub repository.
+- You may need to bypass Gatekeeper the first time you run Animal
+- Homebrew installation may be available in the future
