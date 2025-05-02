@@ -57,6 +57,7 @@ Component Diagram
 │ (core/symbol_   │          │ (core/std/*.go)    │
 │ table.go)       │          │                    │
 └─────────────────┘          └────────────────────┘
+
 ----
 
 The lexer (``core/lexer.go``) is responsible for reading the source code and converting it into tokens. This process is called lexical analysis or tokenization.
