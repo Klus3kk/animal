@@ -1,99 +1,139 @@
-# Animal
+# Animal Language
 
-The goal of this project is to create a new programming language with unique features and applications. The basic functions, operators, etc., are correlated to animal characteristics and sounds.
+[![Documentation Status](https://readthedocs.org/projects/animal/badge/?version=latest)](https://animal.readthedocs.io/en/latest/?badge=latest)
+[![Go Report Card](https://goreportcard.com/badge/github.com/Klus3kk/animal)](https://goreportcard.com/report/github.com/Klus3kk/animal)
+[![Release](https://img.shields.io/github/v/release/Klus3kk/animal)](https://github.com/Klus3kk/animal/releases)
 
-## Building
+Animal is a programming language that uses animal sounds and characteristics as its core syntax elements. It brings a playful yet powerful approach to programming with a complete feature set for both beginners and experienced developers.
 
-To build the Animal interpreter:
-
-```bash
-go build -o animal.exe ./cmd/animal
-```
-
-This will create a binary called `animal`.
-
-To run a `.anml` file:
+## Quick Start
 
 ```bash
-./animal path/to/yourfile.anml
-```
+# Install Animal
+go install github.com/Klus3kk/animal/cmd/animal@latest
 
-To launch the interactive REPL:
-
-```bash
-./animal
-```
-
-OR, if you want to install it:
-```bash
-go install ./cmd/animal
-```
-
-Then you can use it anywhere via:
-```bash
+# Run Animal REPL
 animal
+
+# Execute Animal script
+animal path/to/script.anml
+```
+
+Try this simple Animal program:
+
+```animal
+# Hello World in Animal
+roar "Hello from the animal kingdom!"
+
+# Variables and arithmetic
+age -> 5
+weight -> 10
+total -> age meow weight  # Addition using 'meow'
+
+roar "Total:", total
 ```
 
 ## Features
 
-- Arithmetic operations using animal sounds (`meow`, `woof`, `moo`, etc.)
-- Conditional statements: `growl`, `sniff`, `wag`
-- Looping constructs: `leap`, `pounce`
-- Printing output with `roar`
-- Variable assignment via `->`
-- Function definitions and calls via `howl`
-- `nest` structures (custom object definitions)
-- Lists with built-in methods
+- **Intuitive Syntax**: Programming concepts mapped to animal behaviors
+- **Rich Standard Library**: Built-in functions for common operations
+- **Object-Oriented**: `nest` structures for custom object definitions
+- **Functional Capabilities**: First-class functions with `howl`
+- **Web Assembly Support**: Run Animal in browsers
+- **Interactive REPL**: Try code snippets instantly
 
-## Technologies
+## Documentation
 
-- Go language
-- Custom Lexer
-- Parser with AST generation
-- Interpreter engine
+Complete documentation is available at [animal.readthedocs.io](https://animal.readthedocs.io/).
 
-## Instruction Manual
+## Core Syntax
 
 ### Operators
 
 | Symbol | Animal Word | Meaning        |
 |--------|-------------|----------------|
-| `*`    | `moo`       | Multiplication |
 | `+`    | `meow`      | Addition       |
 | `-`    | `woof`      | Subtraction    |
+| `*`    | `moo`       | Multiplication |
 | `/`    | `drone`     | Division       |
 | `%`    | `squeak`    | Modulo         |
 | `^`    | `soar`      | Exponentiation |
+| `==`   | `sniff`     | Equality       |
+| `!=`   | `growl`     | Inequality     |
 
-### Brackets
-
-- `()` → Round (grouping, function calls)
-- `[]` → Square (lists)
-- `{}` → Curly (blocks)
-
-## Functions and Output
-
-### `roar` — Print to console
+### Control Flow
 
 ```animal
-roar "Hello", 2 meow 3
-```
-
-### `howl` — Define and call functions
-
-```animal
-howl greet(name) {
-    roar "Hi", name
+# Conditionals
+if sniff x == 10 {
+    roar "x equals 10"
+} else {
+    roar "x does not equal 10"
 }
 
-greet("Lucas")
+# Loops
+leap i from 0 to 5 {
+    roar i
+}
+
+# Functions
+howl calculate_area(length, width) {
+    return length moo width  # Multiplication
+}
+
+area -> calculate_area(5, 10)
+roar "Area:", area
 ```
-## Full Documentation
 
-You can explore the complete documentation in the [`docs/`](docs/) folder:
+## 🛠️ Installation
 
-- [Introduction](docs/intro.md)
-- [Syntax Guide](docs/syntax.md)
-- [Language Features](docs/features.md)
-- [Code Examples](docs/examples.md)
-- [Standard Library](docs/stdlib.md)
+### Prerequisites
+
+- Go 1.18 or higher
+- Git
+
+### From Source
+
+```bash
+# Clone the repository
+git clone https://github.com/Klus3kk/animal.git
+cd animal
+
+# Build from source
+go build -o animal ./cmd/animal
+
+# Run the tests
+go test ./...
+```
+
+### From Go Install
+
+```bash
+go install github.com/Klus3kk/animal/cmd/animal@latest
+```
+
+## Online Compiler
+
+Try Animal without installation using our [Online Compiler](https://animal-compiler.example.com).
+
+## Examples
+
+### Simple Calculator
+
+```animal
+howl calculator() {
+    roar "Simple Calculator"
+    roar "Enter first number:"
+    num1 -> input_number()
+    
+    roar "Enter second number:"
+    num2 -> input_number()
+    
+    roar "Sum:", num1 meow num2
+    roar "Difference:", num1 woof num2
+    roar "Product:", num1 moo num2
+    roar "Quotient:", num1 drone num2
+}
+
+calculator()
+```
