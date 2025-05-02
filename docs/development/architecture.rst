@@ -18,25 +18,45 @@ The interpreter is implemented in Go, making it fast, portable, and easy to exte
 Component Diagram
 ---------------
 
-.. graphviz::
+.. code-block:: text
 
-   digraph animal_architecture {
-      rankdir=TB;
-      node [shape=box, style=filled, fillcolor=white];
-
-      source [label="Source Code"];
-      lexer [label="Lexer\n(core/lexer.go)\n\nText → Tokens"];
-      parser [label="Parser\n(core/parser.go)\n\nTokens → AST"];
-      interpreter [label="Interpreter\n(core/interpreter.go)\n\nAST → Execution"];
-      symbol [label="Symbol Table\n(core/symbol_table.go)"];
-      stdlib [label="Standard Library\n(core/std/*.go)"];
-
-      source -> lexer;
-      lexer -> parser;
-      parser -> interpreter;
-      interpreter -> symbol;
-      interpreter -> stdlib;
-   }
+                  ┌─────────────┐
+                  │  Source     │
+                  │  Code       │
+                  └──────┬──────┘
+                         │
+                         ▼
+            ┌────────────────────────┐
+            │  Lexer                 │
+            │  (core/lexer.go)       │
+            │                        │
+            │  Text → Tokens         │
+            └────────────┬───────────┘
+                         │
+                         ▼
+            ┌────────────────────────┐
+            │  Parser                │
+            │  (core/parser.go)      │
+            │                        │
+            │  Tokens → AST          │
+            └────────────┬───────────┘
+                         │
+                         ▼
+   ┌───────────────────────────────────────┐
+   │  Interpreter                          │
+   │  (core/interpreter.go)                │
+   │                                       │
+   │  AST → Execution                      │
+   └────────────────────┬──────────────────┘
+                        │
+        ┌───────────────┴───────────────┐
+        │                               │
+        ▼                               ▼
+┌─────────────────┐          ┌────────────────────┐
+│ Symbol Table    │          │ Standard Library   │
+│ (core/symbol_   │          │ (core/std/*.go)    │
+│ table.go)       │          │                    │
+└─────────────────┘          └────────────────────┘
 ----
 
 The lexer (``core/lexer.go``) is responsible for reading the source code and converting it into tokens. This process is called lexical analysis or tokenization.
